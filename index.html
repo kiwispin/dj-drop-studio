@@ -1799,9 +1799,9 @@
                 // Width FX
                 const wAmt = parseFloat($('widthAmt').value);
                 if (wAmt > 0) {
-                    const wg = ctx.createGain(); wg.gain.value = wAmt * 0.6;
-                    const sL = ctx.createBufferSource(); sL.buffer = voiceObj.buffer; sL.detune.value = (pitchSemis * 100) - 12;
-                    const sR = ctx.createBufferSource(); sR.buffer = voiceObj.buffer; sR.detune.value = (pitchSemis * 100) + 12;
+                    const wg = ctx.createGain(); wg.gain.value = wAmt * 0.85; // Increased gain
+                    const sL = ctx.createBufferSource(); sL.buffer = voiceObj.buffer; sL.detune.value = (pitchSemis * 100) - 25; // Increased detune (-25 cents)
+                    const sR = ctx.createBufferSource(); sR.buffer = voiceObj.buffer; sR.detune.value = (pitchSemis * 100) + 25; // Increased detune (+25 cents)
                     const dL = ctx.createDelay(); dL.delayTime.value = 0.018; const pL = ctx.createStereoPanner(); pL.pan.value = -1;
                     const dR = ctx.createDelay(); dR.delayTime.value = 0.028; const pR = ctx.createStereoPanner(); pR.pan.value = 1;
                     sL.connect(dL).connect(pL).connect(wg); sR.connect(dR).connect(pR).connect(wg); wg.connect(masterComp);
