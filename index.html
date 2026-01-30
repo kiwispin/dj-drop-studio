@@ -1147,6 +1147,9 @@
         let db = null;
         let storage = null;
 
+        // HELPER
+        const $ = (id) => document.getElementById(id);
+
         // Initializing Audio Context (needed for some browsers)
         async function initAudio() {
             if (!ctx) {
