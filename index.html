@@ -928,7 +928,10 @@
                             <span class="track-number">1</span>
                             Intro SFX
                         </div>
-
+                        <label
+                            style="font-size:0.7rem; cursor:pointer; display:flex; align-items:center; gap:4px; color: var(--text-dim); margin-right: 10px;">
+                            <input type="checkbox" id="introDuck"> Auto-Duck
+                        </label>
                     </div>
                     <div class="file-input-wrapper">
                         <label class="file-btn">
@@ -954,7 +957,10 @@
                             <span class="track-number">3</span>
                             Outro SFX
                         </div>
-
+                        <label
+                            style="font-size:0.7rem; cursor:pointer; display:flex; align-items:center; gap:4px; color: var(--text-dim); margin-right: 10px;">
+                            <input type="checkbox" id="outroDuck"> Auto-Duck
+                        </label>
                     </div>
                     <div class="file-input-wrapper">
                         <label class="file-btn">
@@ -1940,10 +1946,11 @@
             masterComp.connect(masterGain); masterGain.connect(offlineCtx.destination);
 
             // -- INTRO --
+            let introGain;
             if (introBuffer && introDur > 0) {
                 const src = offlineCtx.createBufferSource(); src.buffer = introBuffer;
-                const g = offlineCtx.createGain(); g.gain.value = $('introVol').value;
-                src.connect(g).connect(masterComp);
+                introGain = offlineCtx.createGain(); introGain.gain.value = $('introVol').value;
+                src.connect(introGain).connect(masterComp);
                 src.start(timeIntro, introTrim.start, introDur);
             }
 
@@ -2026,18 +2033,61 @@
             main.start(absVoiceStart, cuePoint);
 
             // -- OUTRO --
+            let outroGain;
             if (outroBuffer && outroDur > 0) {
                 const src = offlineCtx.createBufferSource(); src.buffer = outroBuffer;
-                const g = offlineCtx.createGain(); g.gain.value = $('outroVol').value;
-                src.connect(g).connect(masterComp);
+                outroGain = offlineCtx.createGain(); outroGain.gain.value = $('outroVol').value;
+                src.connect(outroGain).connect(masterComp);
                 src.start(realOutroStart, outroTrim.start, outroDur);
             }
 
             // -- DUCKING --
+            // Common ducking points
+            const dStart = timeVoice;
+            const dEnd = timeOutro;
+
+            // 1. Bed Ducking
             if (musicBuffer && $('autoDuck').checked) {
-                const start = timeVoice; const end = timeOutro; const v = parseFloat($('bedVol').value);
-                bedGain.gain.setValueAtTime(v, start); bedGain.gain.linearRampToValueAtTime(v * 0.3, start + 0.3);
-                bedGain.gain.setValueAtTime(v * 0.3, end); bedGain.gain.linearRampToValueAtTime(v, end + 1.0);
+                const v = parseFloat($('bedVol').value);
+                bedGain.gain.setValueAtTime(v, dStart); bedGain.gain.linearRampToValueAtTime(v * 0.3, dStart + 0.3);
+                bedGain.gain.setValueAtTime(v * 0.3, dEnd); bedGain.gain.linearRampToValueAtTime(v, dEnd + 1.0);
+            }
+
+            // 2. Intro Ducking
+            if (introGain && $('introDuck').checked) {
+                const v = parseFloat($('introVol').value);
+                // Only duck if the intro actually overlaps the voice start
+                if ((timeIntro + introDur) > dStart) {
+                    introGain.gain.setValueAtTime(v, dStart);
+                    introGain.gain.linearRampToValueAtTime(v * 0.3, dStart + 0.3);
+                    // If intro extends past voice end (rare but possible), ramp back up
+                    if ((timeIntro + introDur) > dEnd) {
+                        introGain.gain.setValueAtTime(v * 0.3, dEnd);
+                        introGain.gain.linearRampToValueAtTime(v, dEnd + 1.0);
+                    }
+                }
+            }
+
+            // 3. Outro Ducking
+            if (outroGain && $('outroDuck').checked) {
+                const v = parseFloat($('outroVol').value);
+                // Main use case: Outro starts BEFORE voice ends (negative offset)
+                if (realOutroStart < dEnd) {
+                    // If outro starts before ducking start (very negative offset)
+                    if (realOutroStart < dStart) {
+                        outroGain.gain.setValueAtTime(v, dStart);
+                        outroGain.gain.linearRampToValueAtTime(v * 0.3, dStart + 0.3);
+                    } else {
+                        // Starts during voice, should start ducked? 
+                        // Logic: simpler to just ramp down at voice start IF it exists then, 
+                        // OR initialize at ducked volume if it starts during voice.
+                        // Let's stick to the main envelope: valid everywhere between dStart and dEnd.
+                        outroGain.gain.setValueAtTime(v * 0.3, Math.max(realOutroStart, dStart));
+                    }
+
+                    outroGain.gain.setValueAtTime(v * 0.3, dEnd);
+                    outroGain.gain.linearRampToValueAtTime(v, dEnd + 1.0);
+                }
             }
 
             // -- MASTER FADE OUT --
