@@ -648,6 +648,67 @@
             color: var(--text-muted);
         }
 
+        /* === MICRO-ANIMATIONS === */
+
+        /* 1. Tactile Button Press */
+        button:active,
+        .file-btn:active,
+        .drop-zone:active {
+            transform: scale(0.96) translateY(1px);
+            filter: brightness(0.9);
+        }
+
+        /* 2. Pulse Animation for Primary Action */
+        @keyframes pulse-glow {
+            0% {
+                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(249, 115, 22, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+            }
+        }
+
+        .btn-gen:not(:disabled) {
+            animation: pulse-glow 2s infinite;
+        }
+
+        /* 3. Reactive Faders (Glow Intensifies on Touch) */
+        input[type="range"]:active::-webkit-slider-thumb {
+            transform: scale(1.3);
+            box-shadow: 0 0 20px var(--master-glow), 0 0 10px white;
+            cursor: grabbing;
+        }
+
+        input[type="range"]:active::-moz-range-thumb {
+            transform: scale(1.3);
+            box-shadow: 0 0 20px var(--master-glow), 0 0 10px white;
+            cursor: grabbing;
+        }
+
+        /* 4. Smooth List Item Entry */
+        .voice-item,
+        .cloud-item {
+            /* Existing styles... */
+            animation: slideIn 0.2s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
         /* Action Buttons */
         .main-btn {
             padding: 14px 28px;
