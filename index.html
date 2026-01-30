@@ -1448,7 +1448,7 @@
         // --- AUDIO CORE ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const ctx = new AudioContext();
-        const dest = ctx.createMediaStreamDestination();
+
 
         // State & DB (IndexedDB for Local)
         let voiceLibrary = [];
@@ -1459,6 +1459,8 @@
         let recorder = null;
         let audioChunks = [];
         let reverbBuffer = null;
+        let renderedBuffer = null;
+        let playbackSource = null;
 
         // File Objects for Upload
         let currentIntroFile = null;
@@ -1701,9 +1703,16 @@
         };
 
         // -- SEQUENCER --
+        // -- SEQUENCER --
         $('generateBtn').addEventListener('click', async () => {
             if (ctx.state === 'suspended') await ctx.resume();
             if (selectedVoiceIndex === -1) { alert("Select a voice!"); return; }
+
+            // Stop previous playback if any
+            if (playbackSource) {
+                try { playbackSource.stop(); } catch (e) { }
+                playbackSource = null;
+            }
 
             const btn = $('generateBtn');
             const status = $('statusText');
@@ -1712,18 +1721,10 @@
             btn.disabled = true;
             status.textContent = "Rendering...";
             progress.style.width = "0%";
+            $('downloadBtn').disabled = true;
 
-            const masterComp = ctx.createDynamicsCompressor();
-            masterComp.threshold.value = -12; masterComp.knee.value = 30; masterComp.ratio.value = 4; masterComp.attack.value = 0.003; masterComp.release.value = 0.25;
-            const masterGain = ctx.createGain(); masterGain.gain.value = 1.0;
-            masterComp.connect(masterGain); masterGain.connect(ctx.destination); masterGain.connect(dest);
-
-            audioChunks = [];
-            recorder = new MediaRecorder(dest.stream);
-            recorder.ondataavailable = e => audioChunks.push(e.data);
-            recorder.start();
-
-            const t0 = ctx.currentTime + 0.2;
+            // 1. CALCULATE DURATION
+            const t0 = 0; // Relative start time for offline render
             const introDur = introBuffer ? introBuffer.duration : 0;
             const voiceObj = voiceLibrary[selectedVoiceIndex];
             const cuePoint = findAudioStart(voiceObj.buffer);
@@ -1742,173 +1743,206 @@
             const stutterCount = 4; const stutterLen = 0.150;
             const buildUpDur = buildUpOn ? (stutterCount * stutterLen) : 0;
             const rawVoiceDur = (voiceObj.buffer.duration - cuePoint) / pitchRate;
-            const totalVoiceSectionDur = buildUpDur + rawVoiceDur;
+            // Note: The voice duration might be slightly longer due to effects (tail/delay), but we estimate the main section
 
-            // TIMELINE
+            // TIMELINE CALCULATIONS
             const timeIntro = t0;
             let timeVoice = t0 + introOffset;
             if (timeVoice < t0) timeVoice = t0;
             const absVoiceStart = timeVoice + buildUpDur;
-            const timeOutro = timeVoice + totalVoiceSectionDur + outroOffset;
+            const timeOutro = timeVoice + buildUpDur + rawVoiceDur + outroOffset;
 
-            // Intro
+            let realOutroStart = timeOutro;
+            if (realOutroStart < t0) realOutroStart = t0;
+
+            // Determine total length
+            const endIntro = timeIntro + introDur;
+            const endVoice = absVoiceStart + rawVoiceDur + (tailOn ? 2.0 : 0.5); // Add buffer for tail
+            const endOutro = realOutroStart + (outroBuffer ? outroBuffer.duration : 0);
+
+            let naturalEnd = Math.max(endIntro, endVoice, endOutro);
+            let fadeStart = naturalEnd + endTrim;
+
+            // Ensure minimum length
+            if (fadeStart < t0 + 1) fadeStart = t0 + 1;
+
+            const totalDuration = fadeStart + 2.0; // +2s for fade out
+
+            // 2. OFFLINE RENDER
+            const offlineCtx = new OfflineAudioContext(2, totalDuration * ctx.sampleRate, ctx.sampleRate);
+
+            // Re-create graph on offlineCtx
+            const masterComp = offlineCtx.createDynamicsCompressor();
+            masterComp.threshold.value = -12; masterComp.knee.value = 30; masterComp.ratio.value = 4; masterComp.attack.value = 0.003; masterComp.release.value = 0.25;
+            const masterGain = offlineCtx.createGain(); masterGain.gain.value = 1.0;
+            masterComp.connect(masterGain); masterGain.connect(offlineCtx.destination);
+
+            // -- INTRO --
             if (introBuffer) {
-                const src = ctx.createBufferSource(); src.buffer = introBuffer;
-                const g = ctx.createGain(); g.gain.value = $('introVol').value;
+                const src = offlineCtx.createBufferSource(); src.buffer = introBuffer;
+                const g = offlineCtx.createGain(); g.gain.value = $('introVol').value;
                 src.connect(g).connect(masterComp); src.start(timeIntro);
             }
 
-            // Music Bed
-            let bedNode, bedGain;
+            // -- MUSIC BED --
+            let bedGain;
             if (musicBuffer) {
-                bedNode = ctx.createBufferSource(); bedNode.buffer = musicBuffer;
-                bedGain = ctx.createGain(); bedGain.gain.setValueAtTime(parseFloat($('bedVol').value), t0);
+                const bedNode = offlineCtx.createBufferSource(); bedNode.buffer = musicBuffer;
+                bedGain = offlineCtx.createGain(); bedGain.gain.setValueAtTime(parseFloat($('bedVol').value), t0);
                 bedNode.connect(bedGain).connect(masterComp); bedNode.start(t0);
             }
 
-            // Voice
+            // -- VOICE --
             const voiceVol = parseFloat($('voiceVol').value);
+
+            // Build Up
             if (buildUpOn) {
-                const bg = ctx.createGain(); bg.gain.value = voiceVol;
-                const dly = ctx.createDelay(); dly.delayTime.value = 0.005;
-                const lfo = ctx.createOscillator(); lfo.frequency.value = 3;
-                const dep = ctx.createGain(); dep.gain.value = 0.002;
+                const bg = offlineCtx.createGain(); bg.gain.value = voiceVol;
+                const dly = offlineCtx.createDelay(); dly.delayTime.value = 0.005;
+                const lfo = offlineCtx.createOscillator(); lfo.frequency.value = 3;
+                const dep = offlineCtx.createGain(); dep.gain.value = 0.002;
                 lfo.connect(dep).connect(dly.delayTime); lfo.start(t0);
-                const hpf = ctx.createBiquadFilter(); hpf.type = 'highpass';
+                const hpf = offlineCtx.createBiquadFilter(); hpf.type = 'highpass';
                 hpf.frequency.setValueAtTime(200, timeVoice); hpf.frequency.exponentialRampToValueAtTime(1000, timeVoice + buildUpDur);
                 hpf.connect(dly).connect(bg).connect(masterComp);
 
                 const startP = -300; const endP = 0;
                 for (let i = 0; i < stutterCount; i++) {
-                    const s = ctx.createBufferSource(); s.buffer = voiceObj.buffer;
+                    const s = offlineCtx.createBufferSource(); s.buffer = voiceObj.buffer;
                     const p = i / (stutterCount - 1);
                     s.detune.value = (startP + (p * (endP - startP))) + (pitchSemis * 100);
                     s.connect(hpf); s.start(timeVoice + (i * stutterLen), cuePoint, stutterLen);
                 }
             }
 
-            const main = ctx.createBufferSource(); main.buffer = voiceObj.buffer;
+            // Main Voice
+            const main = offlineCtx.createBufferSource(); main.buffer = voiceObj.buffer;
             main.detune.value = pitchSemis * 100;
             let head = main;
 
             if (widthOn) {
-                const pEQ = ctx.createBiquadFilter(); pEQ.type = 'peaking'; pEQ.frequency.value = 3000; pEQ.gain.value = 4;
-                const aEQ = ctx.createBiquadFilter(); aEQ.type = 'highshelf'; aEQ.frequency.value = 10000; aEQ.gain.value = 5;
+                const pEQ = offlineCtx.createBiquadFilter(); pEQ.type = 'peaking'; pEQ.frequency.value = 3000; pEQ.gain.value = 4;
+                const aEQ = offlineCtx.createBiquadFilter(); aEQ.type = 'highshelf'; aEQ.frequency.value = 10000; aEQ.gain.value = 5;
                 main.connect(pEQ).connect(aEQ); head = aEQ;
 
                 // Width FX
                 const wAmt = parseFloat($('widthAmt').value);
                 if (wAmt > 0) {
-                    const wg = ctx.createGain(); wg.gain.value = wAmt * 0.85; // Increased gain
-                    const sL = ctx.createBufferSource(); sL.buffer = voiceObj.buffer; sL.detune.value = (pitchSemis * 100) - 25; // Increased detune (-25 cents)
-                    const sR = ctx.createBufferSource(); sR.buffer = voiceObj.buffer; sR.detune.value = (pitchSemis * 100) + 25; // Increased detune (+25 cents)
-                    const dL = ctx.createDelay(); dL.delayTime.value = 0.018; const pL = ctx.createStereoPanner(); pL.pan.value = -1;
-                    const dR = ctx.createDelay(); dR.delayTime.value = 0.028; const pR = ctx.createStereoPanner(); pR.pan.value = 1;
+                    const wg = offlineCtx.createGain(); wg.gain.value = wAmt * 0.85;
+                    const sL = offlineCtx.createBufferSource(); sL.buffer = voiceObj.buffer; sL.detune.value = (pitchSemis * 100) - 25;
+                    const sR = offlineCtx.createBufferSource(); sR.buffer = voiceObj.buffer; sR.detune.value = (pitchSemis * 100) + 25;
+                    const dL = offlineCtx.createDelay(); dL.delayTime.value = 0.018; const pL = offlineCtx.createStereoPanner(); pL.pan.value = -1;
+                    const dR = offlineCtx.createDelay(); dR.delayTime.value = 0.028; const pR = offlineCtx.createStereoPanner(); pR.pan.value = 1;
                     sL.connect(dL).connect(pL).connect(wg); sR.connect(dR).connect(pR).connect(wg); wg.connect(masterComp);
                     sL.start(absVoiceStart, cuePoint); sR.start(absVoiceStart, cuePoint);
                 }
             }
 
-            const vg = ctx.createGain(); vg.gain.value = voiceVol;
+            const vg = offlineCtx.createGain(); vg.gain.value = voiceVol;
             head.connect(vg).connect(masterComp);
 
+            // Tail FX
             if (tailOn) {
                 const startPct = parseFloat($('tailStart').value);
                 const mix = parseFloat($('tailMix').value);
-                const ts = ctx.createGain(); ts.gain.value = 0;
-                const dL = ctx.createDelay(); dL.delayTime.value = 0.3; const dR = ctx.createDelay(); dR.delayTime.value = 0.45;
-                const fbL = ctx.createGain(); fbL.gain.value = 0.4; const fbR = ctx.createGain(); fbR.gain.value = 0.4;
-                const m = ctx.createChannelMerger(2);
+                const ts = offlineCtx.createGain(); ts.gain.value = 0;
+                const dL = offlineCtx.createDelay(); dL.delayTime.value = 0.3; const dR = offlineCtx.createDelay(); dR.delayTime.value = 0.45;
+                const fbL = offlineCtx.createGain(); fbL.gain.value = 0.4; const fbR = offlineCtx.createGain(); fbR.gain.value = 0.4;
+                const m = offlineCtx.createChannelMerger(2);
                 ts.connect(dL); ts.connect(dR); dL.connect(fbL).connect(dR); dR.connect(fbR).connect(dL);
                 dL.connect(m, 0, 0); dR.connect(m, 0, 1);
-                const rev = ctx.createConvolver(); rev.buffer = reverbBuffer;
+                const rev = offlineCtx.createConvolver(); rev.buffer = reverbBuffer;
                 m.connect(masterComp); ts.connect(rev).connect(masterComp); vg.connect(ts);
                 const tStart = absVoiceStart + (rawVoiceDur * startPct);
                 ts.gain.setValueAtTime(0, tStart); ts.gain.linearRampToValueAtTime(mix, absVoiceStart + rawVoiceDur);
             }
             main.start(absVoiceStart, cuePoint);
 
-            // Outro
+            // -- OUTRO --
             if (outroBuffer) {
-                const src = ctx.createBufferSource(); src.buffer = outroBuffer;
-                const g = ctx.createGain(); g.gain.value = $('outroVol').value;
+                const src = offlineCtx.createBufferSource(); src.buffer = outroBuffer;
+                const g = offlineCtx.createGain(); g.gain.value = $('outroVol').value;
                 src.connect(g).connect(masterComp);
-                let start = timeOutro; if (start < t0) start = t0;
-                src.start(start);
+                src.start(realOutroStart);
             }
 
-            // Ducking
+            // -- DUCKING --
             if (musicBuffer && $('autoDuck').checked) {
                 const start = timeVoice; const end = timeOutro; const v = parseFloat($('bedVol').value);
                 bedGain.gain.setValueAtTime(v, start); bedGain.gain.linearRampToValueAtTime(v * 0.3, start + 0.3);
                 bedGain.gain.setValueAtTime(v * 0.3, end); bedGain.gain.linearRampToValueAtTime(v, end + 1.0);
             }
 
-            // Cleanup
-            progress.style.width = "100%";
-            const endIntro = timeIntro + (introBuffer ? introBuffer.duration : 0);
-            let realOutroStart = timeOutro; if (realOutroStart < t0) realOutroStart = t0;
-            const endOutro = realOutroStart + (outroBuffer ? outroBuffer.duration : 0);
-            const naturalEnd = Math.max(endIntro, endOutro);
-
-            let fadeStart = naturalEnd + endTrim;
-            if (fadeStart < t0) fadeStart = t0 + 1;
-
+            // -- MASTER FADE OUT --
             masterGain.gain.setValueAtTime(1, fadeStart);
-            masterGain.gain.linearRampToValueAtTime(0, fadeStart + 2.0);
+            masterGain.gain.linearRampToValueAtTime(0, totalDuration);
 
-            const stopTime = fadeStart + 2.1;
-            setTimeout(() => {
-                recorder.stop();
-                if (bedNode) bedNode.stop(ctx.currentTime + 0.1);
-                btn.disabled = false; status.textContent = "Done!"; $('downloadBtn').disabled = false; progress.style.width = "0%";
-            }, (stopTime - t0) * 1000);
+            // 3. START RENDER
+            try {
+                renderedBuffer = await offlineCtx.startRendering();
+
+                // 4. PLAYBACK PREVIEW on Main Context
+                if (ctx.state === 'suspended') await ctx.resume();
+
+                playbackSource = ctx.createBufferSource();
+                playbackSource.buffer = renderedBuffer;
+                playbackSource.connect(ctx.destination);
+                playbackSource.start();
+
+                status.textContent = "Playing...";
+                progress.style.width = "100%";
+
+                playbackSource.onended = () => {
+                    status.textContent = "Done!";
+                    btn.disabled = false;
+                    progress.style.width = "0%";
+                    playbackSource = null;
+                };
+
+                // Enable download
+                $('downloadBtn').disabled = false;
+
+            } catch (e) {
+                console.error("Rendering failed", e);
+                status.textContent = "Error!";
+                btn.disabled = false;
+            }
         });
 
         $('downloadBtn').onclick = async () => {
-            const webmBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            try {
-                // Decode the WebM to AudioBuffer, then encode as WAV
-                const arrayBuffer = await webmBlob.arrayBuffer();
-                const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-                const wavBlob = audioBufferToWav(audioBuffer);
+            if (!renderedBuffer) return;
 
-                // Try to use modern File System Access API for Save As dialog
-                if ('showSaveFilePicker' in window) {
-                    try {
-                        const handle = await window.showSaveFilePicker({
-                            suggestedName: `dj-drop-${Date.now()}.wav`,
-                            types: [{
-                                description: 'WAV Audio',
-                                accept: { 'audio/wav': ['.wav'] }
-                            }]
-                        });
-                        const writable = await handle.createWritable();
-                        await writable.write(wavBlob);
-                        await writable.close();
-                        alert('File saved successfully!');
-                        return;
-                    } catch (err) {
-                        if (err.name === 'AbortError') return; // User cancelled
-                        console.warn('Save dialog failed, using fallback:', err);
-                    }
+            status.textContent = "Saving...";
+            const wavBlob = audioBufferToWav(renderedBuffer);
+
+            // Try to use modern File System Access API for Save As dialog
+            if ('showSaveFilePicker' in window) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: `dj-drop-${Date.now()}.wav`,
+                        types: [{
+                            description: 'WAV Audio',
+                            accept: { 'audio/wav': ['.wav'] }
+                        }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(wavBlob);
+                    await writable.close();
+                    status.textContent = "Saved";
+                    return;
+                } catch (err) {
+                    if (err.name === 'AbortError') { status.textContent = "Done!"; return; }
+                    console.warn('Save dialog failed, using fallback:', err);
                 }
-
-                // Fallback for browsers without File System Access API
-                const url = URL.createObjectURL(wavBlob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `dj-drop-${Date.now()}.wav`;
-                a.click();
-            } catch (e) {
-                console.error('WAV conversion failed, falling back to WebM:', e);
-                // Fallback to WebM if conversion fails
-                const url = URL.createObjectURL(webmBlob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `dj-drop-${Date.now()}.webm`;
-                a.click();
             }
+
+            // Fallback
+            const url = URL.createObjectURL(wavBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dj-drop-${Date.now()}.wav`;
+            a.click();
+            status.textContent = "Saved";
         };
     </script>
 </body>
