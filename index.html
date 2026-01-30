@@ -1594,6 +1594,22 @@
             return 0;
         }
 
+        // Search for a stronger peak to ensure short stutters aren't silent
+        function findStrongTransient(buffer, startSec, searchWinSec, threshold) {
+            const sampleRate = buffer.sampleRate;
+            const startIdx = Math.floor(startSec * sampleRate);
+            const endIdx = Math.min(buffer.length, startIdx + Math.floor(searchWinSec * sampleRate));
+            const data = buffer.getChannelData(0);
+
+            for (let i = startIdx; i < endIdx; i++) {
+                if (Math.abs(data[i]) > threshold) {
+                    return i / sampleRate;
+                }
+            }
+            // If no loud peak found, fall back to original start
+            return startSec;
+        }
+
         function createReverbImpulse(duration) {
             const len = ctx.sampleRate * duration;
             const buffer = ctx.createBuffer(2, len, ctx.sampleRate);
@@ -1838,6 +1854,10 @@
                 hpf.frequency.exponentialRampToValueAtTime(500, timeVoice + buildUpDur);
                 hpf.connect(dly).connect(bg).connect(masterComp);
 
+                // Use a tighter start point for stutters to ensure we don't just stutter "silence/breath"
+                // Search for a peak > 0.05 within the first 0.2s of the cuePoint
+                const tightCuePoint = findStrongTransient(voiceObj.buffer, cuePoint, 0.2, 0.05);
+
                 console.log("Stutter Timings:", stutterTimings);
 
                 const startP = -300; const endP = 0;
@@ -1849,7 +1869,9 @@
 
                     const timing = stutterTimings[i];
                     if (timing) {
-                        s.start(timeVoice + timing.start, cuePoint, timing.dur);
+                        // Clamp min duration to avoid glitching
+                        const safeDur = Math.max(0.03, timing.dur);
+                        s.start(timeVoice + timing.start, tightCuePoint, safeDur);
                     }
                 }
             }
