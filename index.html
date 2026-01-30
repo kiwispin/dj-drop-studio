@@ -1147,7 +1147,117 @@
         let db = null;
         let storage = null;
 
-        // Init Firebase (wrapped in try-catch so app works even if Firebase fails)
+        // Initializing Audio Context (needed for some browsers)
+        async function initAudio() {
+            if (!ctx) {
+                ctx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (ctx.state === 'suspended') {
+                await ctx.resume();
+            }
+        }
+
+        // --- PERSISTENT SETTINGS ---
+        function saveSettings() {
+            const settings = {};
+            // Save all sliders
+            document.querySelectorAll('input[type="range"]').forEach(input => {
+                settings[input.id] = input.value;
+            });
+            // Save all checkboxes
+            document.querySelectorAll('input[type="checkbox"]').forEach(input => {
+                settings[input.id] = input.checked;
+            });
+            localStorage.setItem('dj-drop-settings', JSON.stringify(settings));
+        }
+
+        function loadSettings() {
+            const saved = localStorage.getItem('dj-drop-settings');
+            if (saved) {
+                try {
+                    const settings = JSON.parse(saved);
+                    // Restore sliders
+                    document.querySelectorAll('input[type="range"]').forEach(input => {
+                        if (settings[input.id] !== undefined) {
+                            input.value = settings[input.id];
+                            // Trigger input event to update display values
+                            input.dispatchEvent(new Event('input'));
+                        }
+                    });
+                    // Restore checkboxes
+                    document.querySelectorAll('input[type="checkbox"]').forEach(input => {
+                        if (settings[input.id] !== undefined) {
+                            input.checked = settings[input.id];
+                            // Trigger change event if needed
+                            input.dispatchEvent(new Event('change'));
+                        }
+                    });
+                    console.log('Settings loaded from localStorage');
+                } catch (e) {
+                    console.error('Failed to load settings:', e);
+                }
+            }
+        }
+
+        // --- DOM ELEMENTS & EVENT LISTENERS ---
+        const tabLocal = document.getElementById('tabLocal');
+        const tabCloud = document.getElementById('tabCloud');
+        const contentLocal = document.getElementById('contentLocal');
+        const contentCloud = document.getElementById('contentCloud');
+        const voiceUploader = document.getElementById('voiceUploader');
+        const voiceList = document.getElementById('voiceList');
+        const localDropZone = document.getElementById('localDropZone');
+
+        // TABS
+        tabLocal.onclick = () => { switchTab('local'); };
+        tabCloud.onclick = () => { switchTab('cloud'); };
+
+        function switchTab(tab) {
+            if (tab === 'local') {
+                tabLocal.classList.add('active');
+                tabCloud.classList.remove('active');
+                contentLocal.classList.add('active');
+                contentCloud.classList.remove('active');
+            } else {
+                tabLocal.classList.remove('active');
+                tabCloud.classList.add('active');
+                contentLocal.classList.remove('active');
+                contentCloud.classList.add('active');
+            }
+        }
+
+        // SLIDER DISPLAYS & PERSISTENCE
+        // Update number displays next to sliders and save settings
+        document.querySelectorAll('input[type="range"]').forEach(input => {
+            const displayId = input.id + 'Val';
+            const display = document.getElementById(displayId);
+
+            // Update display on input
+            input.addEventListener('input', (e) => {
+                if (display) {
+                    let val = e.target.value;
+                    // Format appropriately based on ID
+                    if (input.id.includes('Offset') || input.id.includes('Trim')) val += 's';
+                    else if (input.id.includes('Pitch')) val += 'st';
+                    else if (input.id === 'widthAmt' || input.id === 'tailStart' || input.id === 'tailMix') val = Math.round(val * 100) + '%';
+
+                    display.innerText = val;
+                }
+                saveSettings(); // Save on change
+            });
+        });
+
+        // Save checkboxes on change
+        document.querySelectorAll('input[type="checkbox"]').forEach(input => {
+            input.addEventListener('change', () => {
+                saveSettings();
+            });
+        });
+
+        // Init settings on load
+        loadSettings();
+
+        // --- FIREBASE INIT ---
         try {
             const app = initializeApp(firebaseConfig);
             const auth = getAuth(app);
@@ -1174,45 +1284,13 @@
             // App continues to work in local-only mode
         }
 
-        // --- DOM REFERENCES ---
-        const $ = (id) => document.getElementById(id);
-
-        // UI Event Binding
-        $('tabLocal').onclick = () => switchTab('local');
-        $('tabCloud').onclick = () => switchTab('cloud');
-
-        // Slider Updates
-        const bindSlider = (id, suffix = '') => {
-            const el = $(id);
-            if (!el) return;
-            el.oninput = (e) => {
-                const val = e.target.value;
-                const displayId = id.endsWith('Amt') ? 'widthVal' : (id + 'Val'); // special case
-                const target = $(displayId);
-                if (target) {
-                    if (id === 'widthAmt' || id === 'tailStart' || id === 'tailMix') target.innerText = Math.round(val * 100) + '%';
-                    else if (id === 'voiceOffset' || id === 'outroOffset' || id === 'endTrim') target.innerText = (val > 0 ? '+' : '') + val + 's';
-                    else if (id === 'voicePitch') target.innerText = (val > 0 ? '+' : '') + val + 'st';
-                    else target.innerText = val;
-                }
-            };
-        }
-        ['introVol', 'voiceVol', 'voicePitch', 'voiceOffset', 'endTrim', 'outroVol', 'outroOffset', 'bedVol', 'widthAmt', 'tailStart', 'tailMix'].forEach(id => bindSlider(id));
-
-        function switchTab(mode) {
-            $('tabLocal').classList.toggle('active', mode === 'local');
-            $('tabCloud').classList.toggle('active', mode === 'cloud');
-            $('contentLocal').classList.toggle('active', mode === 'local');
-            $('contentCloud').classList.toggle('active', mode === 'cloud');
-        }
-
         // --- CLOUD LOGIC ---
         function loadCloudLibrary() {
             if (!cloudEnabled) return;
             const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'sfx_library'));
 
             onSnapshot(q, (snapshot) => {
-                const list = $('cloudList');
+                const list = document.getElementById('cloudList');
                 list.innerHTML = '';
                 if (snapshot.empty) {
                     list.innerHTML = '<li style="padding:10px;text-align:center;font-size:0.8rem;color:#666">Library Empty.<br>Be the first to share!</li>';
