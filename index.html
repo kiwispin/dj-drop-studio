@@ -861,28 +861,33 @@
                     const li = document.createElement('li');
                     li.className = 'voice-item cloud-item';
 
+                    // Check if this is a legacy entry (no storagePath)
+                    const isLegacy = !data.storagePath;
+
                     li.innerHTML = `
-                    <button class="cloud-btn preview-btn" title="Preview">▶</button>
-                    <span class="cloud-name">${data.name}</span>
+                    <button class="cloud-btn preview-btn" title="Preview" ${isLegacy ? 'disabled style="opacity:0.3"' : ''}>▶</button>
+                    <span class="cloud-name" ${isLegacy ? 'style="color:#666; text-decoration:line-through;"' : ''}>${data.name}${isLegacy ? ' (old format)' : ''}</span>
                     <div class="cloud-actions">
-                        <button class="cloud-btn load-btn" data-slot="intro" title="Load as Intro">→I</button>
-                        <button class="cloud-btn load-btn" data-slot="outro" title="Load as Outro">→O</button>
+                        <button class="cloud-btn load-btn" data-slot="intro" title="Load as Intro" ${isLegacy ? 'disabled style="opacity:0.3"' : ''}>→I</button>
+                        <button class="cloud-btn load-btn" data-slot="outro" title="Load as Outro" ${isLegacy ? 'disabled style="opacity:0.3"' : ''}>→O</button>
                         <button class="cloud-btn delete-btn" title="Delete">🗑</button>
                     </div>
                 `;
-                    // Preview button
-                    li.querySelector('.preview-btn').onclick = (e) => {
-                        e.stopPropagation();
-                        previewCloudItem(data.storagePath);
-                    };
-                    // Load buttons
-                    li.querySelectorAll('.load-btn').forEach(btn => {
-                        btn.onclick = (e) => {
+                    // Preview button (only if has storagePath)
+                    if (!isLegacy) {
+                        li.querySelector('.preview-btn').onclick = (e) => {
                             e.stopPropagation();
-                            loadFromCloud(data.storagePath, data.name, btn.dataset.slot);
+                            previewCloudItem(data.storagePath);
                         };
-                    });
-                    // Delete button
+                        // Load buttons
+                        li.querySelectorAll('.load-btn').forEach(btn => {
+                            btn.onclick = (e) => {
+                                e.stopPropagation();
+                                loadFromCloud(data.storagePath, data.name, btn.dataset.slot);
+                            };
+                        });
+                    }
+                    // Delete button (always works)
                     li.querySelector('.delete-btn').onclick = (e) => {
                         e.stopPropagation();
                         deleteCloudItem(docSnap.id, data.storagePath, data.name);
@@ -976,9 +981,15 @@
             }
 
             try {
-                // Delete from Storage
-                const storageRef = ref(storage, storagePath);
-                await deleteObject(storageRef);
+                // Delete from Storage (only if storagePath exists)
+                if (storagePath) {
+                    try {
+                        const storageRef = ref(storage, storagePath);
+                        await deleteObject(storageRef);
+                    } catch (storageErr) {
+                        console.warn('Storage delete failed (may not exist):', storageErr);
+                    }
+                }
 
                 // Delete from Firestore
                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sfx_library', docId));
