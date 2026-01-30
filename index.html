@@ -849,22 +849,6 @@
                 grid-template-columns: 1fr;
             }
         }
-
-        /* Tiny Select for Stutter */
-        .tiny-select {
-            background: rgba(0, 0, 0, 0.3);
-            color: var(--master);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            font-size: 0.7rem;
-            padding: 2px 4px;
-            cursor: pointer;
-            outline: none;
-        }
-
-        .tiny-select:focus {
-            border-color: var(--master);
-        }
     </style>
 </head>
 
@@ -1006,13 +990,7 @@
                         </div>
                         <div class="param-text-row">
                             <span>Stutters</span>
-                            <select id="stutterCount" class="tiny-select">
-                                <option value="2">2x</option>
-                                <option value="4" selected>4x</option>
-                                <option value="8">8x</option>
-                                <option value="16">16x</option>
-                                <option value="32">32x</option>
-                            </select>
+                            <span class="text-master">4x</span>
                         </div>
                         <div class="param-text-row">
                             <span>FX Chain</span>
@@ -1193,10 +1171,6 @@
             document.querySelectorAll('input[type="checkbox"]').forEach(input => {
                 settings[input.id] = input.checked;
             });
-            // Save selects
-            document.querySelectorAll('select').forEach(select => {
-                settings[select.id] = select.value;
-            });
             localStorage.setItem('dj-drop-settings', JSON.stringify(settings));
         }
 
@@ -1219,12 +1193,6 @@
                             input.checked = settings[input.id];
                             // Trigger change event if needed
                             input.dispatchEvent(new Event('change'));
-                        }
-                    });
-                    // Restore selects
-                    document.querySelectorAll('select').forEach(select => {
-                        if (settings[select.id] !== undefined) {
-                            select.value = settings[select.id];
                         }
                     });
                     console.log('Settings loaded from localStorage');
@@ -1285,13 +1253,6 @@
         // Save checkboxes on change
         document.querySelectorAll('input[type="checkbox"]').forEach(input => {
             input.addEventListener('change', () => {
-                saveSettings();
-            });
-        });
-
-        // Save selects on change
-        document.querySelectorAll('select').forEach(select => {
-            select.addEventListener('change', () => {
                 saveSettings();
             });
         });
@@ -1594,22 +1555,6 @@
             return 0;
         }
 
-        // Search for a stronger peak to ensure short stutters aren't silent
-        function findStrongTransient(buffer, startSec, searchWinSec, threshold) {
-            const sampleRate = buffer.sampleRate;
-            const startIdx = Math.floor(startSec * sampleRate);
-            const endIdx = Math.min(buffer.length, startIdx + Math.floor(searchWinSec * sampleRate));
-            const data = buffer.getChannelData(0);
-
-            for (let i = startIdx; i < endIdx; i++) {
-                if (Math.abs(data[i]) > threshold) {
-                    return i / sampleRate;
-                }
-            }
-            // If no loud peak found, fall back to original start
-            return startSec;
-        }
-
         function createReverbImpulse(duration) {
             const len = ctx.sampleRate * duration;
             const buffer = ctx.createBuffer(2, len, ctx.sampleRate);
@@ -1794,8 +1739,7 @@
             const widthOn = $('widthOn').checked;
             const tailOn = $('tailOn').checked;
 
-            const stutterCount = parseInt($('stutterCount').value) || 4;
-            const stutterLen = 0.150;
+            const stutterCount = 4; const stutterLen = 0.150;
             const buildUpDur = buildUpOn ? (stutterCount * stutterLen) : 0;
             const rawVoiceDur = (voiceObj.buffer.duration - cuePoint) / pitchRate;
             const totalVoiceSectionDur = buildUpDur + rawVoiceDur;
@@ -1831,23 +1775,15 @@
                 const dep = ctx.createGain(); dep.gain.value = 0.002;
                 lfo.connect(dep).connect(dly.delayTime); lfo.start(t0);
                 const hpf = ctx.createBiquadFilter(); hpf.type = 'highpass';
-                hpf.frequency.setValueAtTime(200, timeVoice);
-                // Reduced max frequency from 1000 to 500 to prevent silencing deep voices
-                hpf.frequency.exponentialRampToValueAtTime(500, timeVoice + buildUpDur);
+                hpf.frequency.setValueAtTime(200, timeVoice); hpf.frequency.exponentialRampToValueAtTime(1000, timeVoice + buildUpDur);
                 hpf.connect(dly).connect(bg).connect(masterComp);
-
-                // Use a tighter start point for stutters to ensure we don't just stutter "silence/breath"
-                // Search for a peak > 0.05 within the first 0.2s of the cuePoint
-                const tightCuePoint = findStrongTransient(voiceObj.buffer, cuePoint, 0.2, 0.05);
 
                 const startP = -300; const endP = 0;
                 for (let i = 0; i < stutterCount; i++) {
                     const s = ctx.createBufferSource(); s.buffer = voiceObj.buffer;
                     const p = i / (stutterCount - 1);
                     s.detune.value = (startP + (p * (endP - startP))) + (pitchSemis * 100);
-                    s.connect(hpf);
-
-                    s.start(timeVoice + (i * stutterLen), tightCuePoint, stutterLen);
+                    s.connect(hpf); s.start(timeVoice + (i * stutterLen), cuePoint, stutterLen);
                 }
             }
 
