@@ -1778,9 +1778,27 @@
             const widthOn = $('widthOn').checked;
             const tailOn = $('tailOn').checked;
 
-            const stutterCount = parseInt($('stutterCount').value) || 4; 
-            const stutterLen = 0.150;
-            const buildUpDur = buildUpOn ? (stutterCount * stutterLen) : 0;
+            const stutterCount = parseInt($('stutterCount').value) || 4;
+
+            // Calculate variable stutter timings (halve speed every 4 stutters)
+            let stutterTimings = [];
+            let currentStutterTime = 0;
+            let currentStutterLen = 0.150;
+
+            if (buildUpOn) {
+                for (let i = 0; i < stutterCount; i++) {
+                    if (i > 0 && i % 4 === 0) {
+                        currentStutterLen /= 2;
+                    }
+                    stutterTimings.push({
+                        start: currentStutterTime,
+                        dur: currentStutterLen
+                    });
+                    currentStutterTime += currentStutterLen;
+                }
+            }
+
+            const buildUpDur = buildUpOn ? currentStutterTime : 0;
             const rawVoiceDur = (voiceObj.buffer.duration - cuePoint) / pitchRate;
             const totalVoiceSectionDur = buildUpDur + rawVoiceDur;
 
@@ -1823,7 +1841,10 @@
                     const s = ctx.createBufferSource(); s.buffer = voiceObj.buffer;
                     const p = i / (stutterCount - 1);
                     s.detune.value = (startP + (p * (endP - startP))) + (pitchSemis * 100);
-                    s.connect(hpf); s.start(timeVoice + (i * stutterLen), cuePoint, stutterLen);
+                    s.connect(hpf);
+
+                    const timing = stutterTimings[i];
+                    s.start(timeVoice + timing.start, cuePoint, timing.dur);
                 }
             }
 
