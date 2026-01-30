@@ -1911,6 +1911,7 @@
 
         $('downloadBtn').onclick = async () => {
             if (!renderedBuffer) return;
+            const status = $('statusText');
 
             status.textContent = "Saving...";
             const wavBlob = audioBufferToWav(renderedBuffer);
