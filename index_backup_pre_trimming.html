@@ -5,9 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DJ Drop Studio</title>
-    <!-- Wavesurfer.js -->
-    <script src="https://unpkg.com/wavesurfer.js@7"></script>
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
     <style>
         /* === DJ DROP STUDIO - PROFESSIONAL REDESIGN === */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -470,15 +467,6 @@
             margin-bottom: 6px;
         }
 
-        .waveform-container {
-            margin-top: 8px;
-            margin-bottom: 8px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 4px;
-            overflow: hidden;
-            width: 100%;
-        }
-
         .val-display {
             color: var(--master);
             font-family: 'Inter', monospace;
@@ -931,13 +919,10 @@
                         </button>
                     </div>
                     <div class="file-input-wrapper">
-                        <label class="file-btn">
-                            Load Intro <input type="file" id="introFile" accept="audio/*">
-                        </label>
-                        <span id="introStatus" class="file-status">No file loaded</span>
+                        <label for="introFile" class="file-btn">📂 Load File</label>
+                        <input type="file" id="introFile" accept="audio/*">
+                        <div id="introStatus" class="file-status"></div>
                     </div>
-                    <!-- Waveform Container -->
-                    <div id="introWave" class="waveform-container"></div>
                     <div class="control-group" style="margin-top: 12px;">
                         <div class="control-header">
                             <span>Volume</span>
@@ -962,13 +947,10 @@
                         </button>
                     </div>
                     <div class="file-input-wrapper">
-                        <label class="file-btn">
-                            Load Outro <input type="file" id="outroFile" accept="audio/*">
-                        </label>
-                        <span id="outroStatus" class="file-status">No file loaded</span>
+                        <label for="outroFile" class="file-btn">📂 Load File</label>
+                        <input type="file" id="outroFile" accept="audio/*">
+                        <div id="outroStatus" class="file-status"></div>
                     </div>
-                    <!-- Waveform Container -->
-                    <div id="outroWave" class="waveform-container"></div>
                     <div class="track-row" style="margin-top: 12px; gap: 12px;">
                         <div class="control-group" style="flex: 1; margin: 0;">
                             <div class="control-header">
@@ -1532,16 +1514,8 @@
                         if (type === 'outro') currentOutroFile = file;
 
                         const buff = await loadAudioFile(file);
-                        if (type === 'intro') {
-                            introBuffer = buff;
-                            $('introStatus').innerText = "Loaded: " + (file.name || "Cloud Audio");
-                            initWaveform('introWave', file, 'intro');
-                        }
-                        if (type === 'outro') {
-                            outroBuffer = buff;
-                            $('outroStatus').innerText = "Loaded: " + (file.name || "Cloud Audio");
-                            initWaveform('outroWave', file, 'outro');
-                        }
+                        if (type === 'intro') { introBuffer = buff; $('introStatus').innerText = "Loaded: " + (file.name || "Cloud Audio"); }
+                        if (type === 'outro') { outroBuffer = buff; $('outroStatus').innerText = "Loaded: " + (file.name || "Cloud Audio"); }
                         if (type === 'bed') { musicBuffer = buff; $('bedStatus').innerText = "Loaded: " + (file.name || "Cloud Audio"); }
                     }
                 };
@@ -1681,71 +1655,6 @@
             if (voiceLibrary[idx]) $('selectedVoiceName').textContent = voiceLibrary[idx].name;
         }
 
-        // -- WAVESURFER HELPER --
-        let wsIntro = null, wsOutro = null;
-        let wsIntroRegion = null, wsOutroRegion = null;
-        let introTrim = { start: 0, end: 0 };
-        let outroTrim = { start: 0, end: 0 };
-
-        async function initWaveform(containerId, file, type) {
-            if (!file) return;
-            // Clear old
-            if (type === 'intro' && wsIntro) { wsIntro.destroy(); wsIntro = null; }
-            if (type === 'outro' && wsOutro) { wsOutro.destroy(); wsOutro = null; }
-
-            const container = document.getElementById(containerId);
-            container.innerHTML = '';
-
-            const ws = WaveSurfer.create({
-                container: container,
-                waveColor: type === 'intro' ? '#0ea5e9' : '#f43f5e',
-                progressColor: 'rgba(255,255,255,0.3)',
-                height: 60,
-                barWidth: 2,
-                barGap: 1,
-                cursorWidth: 1,
-                cursorColor: '#fff',
-                normalize: true,
-                interact: false,
-            });
-
-            // Register Regions
-            const wsRegions = ws.registerPlugin(WaveSurfer.Regions.create());
-
-            ws.loadBlob(file);
-
-            ws.on('ready', () => {
-                const dur = ws.getDuration();
-                // Default to full length
-                const region = wsRegions.addRegion({
-                    start: 0,
-                    end: dur,
-                    color: 'rgba(255, 255, 255, 0.1)',
-                    drag: true,
-                    resize: true
-                });
-
-                if (type === 'intro') {
-                    wsIntro = ws;
-                    wsIntroRegion = region;
-                    introTrim = { start: 0, end: dur };
-                } else {
-                    wsOutro = ws;
-                    wsOutroRegion = region;
-                    outroTrim = { start: 0, end: dur };
-                }
-
-                region.on('update-end', () => {
-                    if (type === 'intro') introTrim = { start: region.start, end: region.end };
-                    else outroTrim = { start: region.start, end: region.end };
-                });
-
-                region.on('click', () => {
-                    region.play();
-                });
-            });
-        }
-
         // -- EVENT LISTENERS --
         $('voiceUploader').addEventListener('change', async (e) => {
             const files = Array.from(e.target.files);
@@ -1769,7 +1678,6 @@
             saveTrackToDB("intro", f);
             introBuffer = await loadAudioFile(f);
             $('introStatus').innerText = "Loaded: " + f.name;
-            initWaveform('introWave', f, 'intro');
         });
 
         $('outroFile').addEventListener('change', async (e) => {
@@ -1778,7 +1686,6 @@
             saveTrackToDB("outro", f);
             outroBuffer = await loadAudioFile(f);
             $('outroStatus').innerText = "Loaded: " + f.name;
-            initWaveform('outroWave', f, 'outro');
         });
 
         $('bedFile').addEventListener('change', async (e) => {
@@ -1821,10 +1728,7 @@
 
             // 1. CALCULATE DURATION
             const t0 = 0; // Relative start time for offline render
-
-            // Use Trimmed Duration for Intro
-            const introDur = (introBuffer && introTrim.end > introTrim.start) ? (introTrim.end - introTrim.start) : 0;
-
+            const introDur = introBuffer ? introBuffer.duration : 0;
             const voiceObj = voiceLibrary[selectedVoiceIndex];
             const cuePoint = findAudioStart(voiceObj.buffer);
 
@@ -1854,13 +1758,10 @@
             let realOutroStart = timeOutro;
             if (realOutroStart < t0) realOutroStart = t0;
 
-            // Use Trimmed Duration for Outro
-            const outroDur = (outroBuffer && outroTrim.end > outroTrim.start) ? (outroTrim.end - outroTrim.start) : 0;
-
             // Determine total length
             const endIntro = timeIntro + introDur;
             const endVoice = absVoiceStart + rawVoiceDur + (tailOn ? 2.0 : 0.5); // Add buffer for tail
-            const endOutro = realOutroStart + outroDur;
+            const endOutro = realOutroStart + (outroBuffer ? outroBuffer.duration : 0);
 
             let naturalEnd = Math.max(endIntro, endVoice, endOutro);
             let fadeStart = naturalEnd + endTrim;
@@ -1880,11 +1781,10 @@
             masterComp.connect(masterGain); masterGain.connect(offlineCtx.destination);
 
             // -- INTRO --
-            if (introBuffer && introDur > 0) {
+            if (introBuffer) {
                 const src = offlineCtx.createBufferSource(); src.buffer = introBuffer;
                 const g = offlineCtx.createGain(); g.gain.value = $('introVol').value;
-                src.connect(g).connect(masterComp);
-                src.start(timeIntro, introTrim.start, introDur);
+                src.connect(g).connect(masterComp); src.start(timeIntro);
             }
 
             // -- MUSIC BED --
@@ -1962,11 +1862,11 @@
             main.start(absVoiceStart, cuePoint);
 
             // -- OUTRO --
-            if (outroBuffer && outroDur > 0) {
+            if (outroBuffer) {
                 const src = offlineCtx.createBufferSource(); src.buffer = outroBuffer;
                 const g = offlineCtx.createGain(); g.gain.value = $('outroVol').value;
                 src.connect(g).connect(masterComp);
-                src.start(realOutroStart, outroTrim.start, outroDur);
+                src.start(realOutroStart);
             }
 
             // -- DUCKING --
