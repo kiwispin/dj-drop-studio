@@ -1,0 +1,7 @@
+[
+  {
+    "origin": ["https://kiwispin.github.io", "http://localhost:8080"],
+    "method": ["GET"],
+    "maxAgeSeconds": 3600
+  }
+]
