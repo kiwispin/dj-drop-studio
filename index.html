@@ -1740,8 +1740,20 @@
                     else outroTrim = { start: region.start, end: region.end };
                 });
 
+                // Update while dragging for smoother UI feedback (optional but good)
+                region.on('update', () => {
+                    if (type === 'intro') introTrim = { start: region.start, end: region.end };
+                    else outroTrim = { start: region.start, end: region.end };
+                });
+
+                // Play on click
                 region.on('click', () => {
                     region.play();
+                });
+
+                // Stop at end of region
+                region.on('out', () => {
+                    ws.pause();
                 });
             });
         }
