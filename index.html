@@ -849,6 +849,22 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* Tiny Select for Stutter */
+        .tiny-select {
+            background: rgba(0, 0, 0, 0.3);
+            color: var(--master);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.7rem;
+            padding: 2px 4px;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .tiny-select:focus {
+            border-color: var(--master);
+        }
     </style>
 </head>
 
@@ -990,7 +1006,13 @@
                         </div>
                         <div class="param-text-row">
                             <span>Stutters</span>
-                            <span class="text-master">4x</span>
+                            <select id="stutterCount" class="tiny-select">
+                                <option value="2">2x</option>
+                                <option value="4" selected>4x</option>
+                                <option value="8">8x</option>
+                                <option value="16">16x</option>
+                                <option value="32">32x</option>
+                            </select>
                         </div>
                         <div class="param-text-row">
                             <span>FX Chain</span>
@@ -1171,6 +1193,10 @@
             document.querySelectorAll('input[type="checkbox"]').forEach(input => {
                 settings[input.id] = input.checked;
             });
+            // Save selects
+            document.querySelectorAll('select').forEach(select => {
+                settings[select.id] = select.value;
+            });
             localStorage.setItem('dj-drop-settings', JSON.stringify(settings));
         }
 
@@ -1193,6 +1219,12 @@
                             input.checked = settings[input.id];
                             // Trigger change event if needed
                             input.dispatchEvent(new Event('change'));
+                        }
+                    });
+                    // Restore selects
+                    document.querySelectorAll('select').forEach(select => {
+                        if (settings[select.id] !== undefined) {
+                            select.value = settings[select.id];
                         }
                     });
                     console.log('Settings loaded from localStorage');
@@ -1253,6 +1285,13 @@
         // Save checkboxes on change
         document.querySelectorAll('input[type="checkbox"]').forEach(input => {
             input.addEventListener('change', () => {
+                saveSettings();
+            });
+        });
+
+        // Save selects on change
+        document.querySelectorAll('select').forEach(select => {
+            select.addEventListener('change', () => {
                 saveSettings();
             });
         });
@@ -1739,7 +1778,8 @@
             const widthOn = $('widthOn').checked;
             const tailOn = $('tailOn').checked;
 
-            const stutterCount = 4; const stutterLen = 0.150;
+            const stutterCount = parseInt($('stutterCount').value) || 4; 
+            const stutterLen = 0.150;
             const buildUpDur = buildUpOn ? (stutterCount * stutterLen) : 0;
             const rawVoiceDur = (voiceObj.buffer.duration - cuePoint) / pitchRate;
             const totalVoiceSectionDur = buildUpDur + rawVoiceDur;
