@@ -1110,10 +1110,16 @@
                         style="font-size:0.75rem; cursor:pointer; display:flex; align-items:center; gap:6px; color: var(--text-dim);">
                         <input type="checkbox" id="autoDuck" checked> Auto-Duck
                     </label>
+                    <label
+                        style="font-size:0.75rem; cursor:pointer; display:flex; align-items:center; gap:6px; color: var(--text-dim); margin-left: 10px;">
+                        <input type="checkbox" id="bedOn" checked> Active
+                    </label>
                 </div>
                 <div class="track-row">
                     <div class="file-input-wrapper" style="flex: 1;">
                         <label for="bedFile" class="file-btn">📂 Load Music</label>
+                        <button class="param-btn" id="clearBedBtn" style="padding: 4px 8px;"
+                            title="Clear Music">🗑</button>
                         <input type="file" id="bedFile" accept="audio/*">
                         <div id="bedStatus" class="file-status"></div>
                     </div>
@@ -1829,6 +1835,14 @@
             initWaveform('bedWave', f, 'bed');
         });
 
+        $('clearBedBtn').onclick = () => {
+            musicBuffer = null;
+            if (wsBed) { wsBed.destroy(); wsBed = null; }
+            document.getElementById('bedWave').innerHTML = '';
+            $('bedStatus').innerText = "No file loaded";
+            $('bedFile').value = '';
+        };
+
         // CLOUD UPLOAD HANDLERS
         $('uploadIntroBtn').onclick = () => {
             if (currentIntroFile) uploadToCloud(currentIntroFile, 'intro');
@@ -1954,7 +1968,7 @@
 
             // -- MUSIC BED --
             let bedGain;
-            if (musicBuffer) {
+            if (musicBuffer && $('bedOn').checked) {
                 const bedNode = offlineCtx.createBufferSource(); bedNode.buffer = musicBuffer;
                 bedGain = offlineCtx.createGain(); bedGain.gain.setValueAtTime(parseFloat($('bedVol').value), t0);
                 bedNode.connect(bedGain).connect(masterComp);
