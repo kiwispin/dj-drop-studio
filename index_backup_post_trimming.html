@@ -604,113 +604,6 @@
             fill: currentColor;
         }
 
-        /* === VISUAL SEQUENCER === */
-        .sequencer-container {
-            margin-top: 16px;
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 16px;
-            user-select: none;
-        }
-
-        .seq-header {
-            font-size: 0.8rem;
-            font-weight: 700;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            margin-bottom: 12px;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .seq-timeline {
-            position: relative;
-            background: rgba(0, 0, 0, 0.4);
-            border-radius: 6px;
-            overflow: hidden;
-            /* Clips are contained */
-            padding: 8px 0;
-            min-height: 120px;
-        }
-
-        .seq-ruler {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 100%;
-            pointer-events: none;
-            background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-            background-size: 50px 100%;
-            /* Approx grid */
-        }
-
-        .seq-track {
-            height: 28px;
-            margin-bottom: 4px;
-            position: relative;
-            width: 100%;
-        }
-
-        .seq-clip {
-            position: absolute;
-            top: 0;
-            height: 100%;
-            border-radius: 4px;
-            cursor: grab;
-            display: flex;
-            align-items: center;
-            padding: 0 8px;
-            font-size: 0.7rem;
-            color: rgba(255, 255, 255, 0.9);
-            font-weight: 600;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-            white-space: nowrap;
-            overflow: hidden;
-            transition: background 0.1s;
-        }
-
-        .seq-clip:active {
-            cursor: grabbing;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-            z-index: 10;
-        }
-
-        .clip-intro {
-            background: rgba(34, 197, 94, 0.6);
-            border: 1px solid var(--intro);
-        }
-
-        .clip-intro:hover {
-            background: rgba(34, 197, 94, 0.8);
-        }
-
-        .clip-voice {
-            background: rgba(217, 70, 239, 0.6);
-            border: 1px solid var(--voice);
-        }
-
-        .clip-voice:hover {
-            background: rgba(217, 70, 239, 0.8);
-        }
-
-        .clip-outro {
-            background: rgba(168, 85, 247, 0.6);
-            border: 1px solid var(--outro);
-        }
-
-        .clip-outro:hover {
-            background: rgba(168, 85, 247, 0.8);
-        }
-
-        .clip-bed {
-            background: rgba(6, 182, 212, 0.2);
-            border: 1px solid rgba(6, 182, 212, 0.4);
-            cursor: default;
-        }
-
         /* === STICKY ACTION BAR === */
         .action-bar {
             position: sticky;
@@ -1051,31 +944,6 @@
                             <span class="val-display" id="introVolVal">0.8</span>
                         </div>
                         <input type="range" id="introVol" min="0" max="1.5" step="0.1" value="0.8">
-                    </div>
-                </div>
-
-                <!-- === VISUAL SEQUENCER === -->
-                <div class="sequencer-container">
-                    <div class="seq-header">
-                        <span>Timeline Arranger</span>
-                        <span style="font-size:0.7rem; font-weight:400; opacity:0.7">Drag clips to adjust timing</span>
-                    </div>
-                    <div class="seq-timeline" id="seqTimeline">
-                        <div class="seq-ruler"></div>
-
-                        <!-- Tracks -->
-                        <div class="seq-track">
-                            <div class="seq-clip clip-intro" id="clipIntro" data-track="intro">INTRO</div>
-                        </div>
-                        <div class="seq-track">
-                            <div class="seq-clip clip-voice" id="clipVoice" data-track="voice">VOICE</div>
-                        </div>
-                        <div class="seq-track">
-                            <div class="seq-clip clip-outro" id="clipOutro" data-track="outro">OUTRO</div>
-                        </div>
-                        <div class="seq-track" style="margin-top:8px; opacity:0.6">
-                            <div class="seq-clip clip-bed" id="clipBed" style="width:100%">MUSIC BED</div>
-                        </div>
                     </div>
                 </div>
 
@@ -1668,19 +1536,13 @@
                             introBuffer = buff;
                             $('introStatus').innerText = "Loaded: " + (file.name || "Cloud Audio");
                             initWaveform('introWave', file, 'intro');
-                            updateSequencer();
                         }
                         if (type === 'outro') {
                             outroBuffer = buff;
                             $('outroStatus').innerText = "Loaded: " + (file.name || "Cloud Audio");
                             initWaveform('outroWave', file, 'outro');
-                            updateSequencer();
                         }
-                        if (type === 'bed') {
-                            musicBuffer = buff;
-                            $('bedStatus').innerText = "Loaded: " + (file.name || "Cloud Audio");
-                            updateSequencer();
-                        }
+                        if (type === 'bed') { musicBuffer = buff; $('bedStatus').innerText = "Loaded: " + (file.name || "Cloud Audio"); }
                     }
                 };
             });
@@ -1817,7 +1679,6 @@
                 }
             }
             if (voiceLibrary[idx]) $('selectedVoiceName').textContent = voiceLibrary[idx].name;
-            updateSequencer(); // Update on voice select
         }
 
         // -- WAVESURFER HELPER --
@@ -1877,14 +1738,12 @@
                 region.on('update-end', () => {
                     if (type === 'intro') introTrim = { start: region.start, end: region.end };
                     else outroTrim = { start: region.start, end: region.end };
-                    updateSequencer();
                 });
 
                 // Update while dragging for smoother UI feedback (optional but good)
                 region.on('update', () => {
                     if (type === 'intro') introTrim = { start: region.start, end: region.end };
                     else outroTrim = { start: region.start, end: region.end };
-                    updateSequencer();
                 });
 
                 // Play on click
@@ -1925,7 +1784,6 @@
             introBuffer = await loadAudioFile(f);
             $('introStatus').innerText = "Loaded: " + f.name;
             initWaveform('introWave', f, 'intro');
-            updateSequencer();
         });
 
         $('outroFile').addEventListener('change', async (e) => {
@@ -1935,7 +1793,6 @@
             outroBuffer = await loadAudioFile(f);
             $('outroStatus').innerText = "Loaded: " + f.name;
             initWaveform('outroWave', f, 'outro');
-            updateSequencer();
         });
 
         $('bedFile').addEventListener('change', async (e) => {
@@ -1943,7 +1800,6 @@
             saveTrackToDB("bed", f);
             musicBuffer = await loadAudioFile(f);
             $('bedStatus').innerText = "Loaded: " + f.name;
-            updateSequencer();
         });
 
         // CLOUD UPLOAD HANDLERS
@@ -2206,144 +2062,6 @@
             a.click();
             status.textContent = "Saved";
         };
-
-        // --- VISUAL SEQUENCER LOGIC ---
-        const SEQ_PX_PER_SEC = 20; // Scale: 20px = 1 second
-
-        function updateSequencer() {
-            // durations
-            const introD = (introBuffer && introTrim.end > introTrim.start) ? (introTrim.end - introTrim.start) : 0;
-            const outroD = (outroBuffer && outroTrim.end > outroTrim.start) ? (outroTrim.end - outroTrim.start) : 0;
-
-            // Voice duration (approx)
-            let voiceD = 0;
-            if (voiceLibrary[selectedVoiceIndex]) {
-                const vBuf = voiceLibrary[selectedVoiceIndex].buffer;
-                const pitchSemis = parseInt($('voicePitch').value);
-                const pitchRate = Math.pow(2, pitchSemis / 12);
-                const cue = findAudioStart(vBuf);
-                voiceD = (vBuf.duration - cue) / pitchRate;
-            }
-
-            // Offsets
-            const introOff = parseFloat($('voiceOffset').value) * -1; // "Voice offset" is relative, so let's treat intro as movable? 
-            // WAIT - The current logic is: Voice Offset is how long AFTER intro starts that voice starts.
-            // But we want to visualize strictly on a timeline.
-            // Let's pin BED at 0.
-            // INTRO starts at 0.
-            // VOICE starts at introOffset (voiceOffset input).
-            // OUTRO starts at (voiceStart + voiceDur + outroOffset).
-
-            // Actually, to fully "Sequence", we should allow dragging Intro too? 
-            // For now, let's keep the existing logic:
-            // T0 = 0. 
-            // Intro Start = 0.
-            // Voice Start = Intro Start + Input('voiceOffset').
-            // Outro Start = Voice End + Input('outroOffset').
-
-            const vOff = parseFloat($('voiceOffset').value);
-            const oOff = parseFloat($('outroOffset').value);
-            const buildUp = $('buildUpOn').checked ? (4 * 0.150) : 0;
-
-            const tIntro = 0;
-            const tVoice = Math.max(0, tIntro + vOff);
-            const tOutro = Math.max(0, tVoice + buildUp + voiceD + oOff);
-
-            // Update Widths
-            $('clipIntro').style.width = (introD * SEQ_PX_PER_SEC) + 'px';
-            $('clipVoice').style.width = ((voiceD + buildUp) * SEQ_PX_PER_SEC) + 'px';
-            $('clipOutro').style.width = (outroD * SEQ_PX_PER_SEC) + 'px';
-
-            // Update Positions
-            $('clipIntro').style.left = (tIntro * SEQ_PX_PER_SEC) + 'px';
-            $('clipVoice').style.left = (tVoice * SEQ_PX_PER_SEC) + 'px';
-            $('clipOutro').style.left = (tOutro * SEQ_PX_PER_SEC) + 'px';
-
-            // Update Bed (Visual only)
-            if (musicBuffer) $('clipBed').style.width = (musicBuffer.duration * SEQ_PX_PER_SEC) + 'px';
-        }
-
-        // Init Dragging
-        function initDraggable(elId, onDrag) {
-            const el = document.getElementById(elId);
-            let isDragging = false;
-            let startX, startLeft;
-
-            el.addEventListener('mousedown', (e) => {
-                isDragging = true;
-                startX = e.clientX;
-                startLeft = el.offsetLeft;
-                el.style.zIndex = 100;
-                document.body.style.cursor = 'grabbing';
-            });
-
-            window.addEventListener('mousemove', (e) => {
-                if (!isDragging) return;
-                const dx = e.clientX - startX;
-                let newLeft = startLeft + dx;
-                if (newLeft < 0) newLeft = 0;
-
-                el.style.left = newLeft + 'px';
-
-                // Convert px back to seconds
-                const newTime = newLeft / SEQ_PX_PER_SEC;
-                onDrag(newTime);
-            });
-
-            window.addEventListener('mouseup', () => {
-                if (isDragging) {
-                    isDragging = false;
-                    el.style.zIndex = '';
-                    document.body.style.cursor = '';
-                }
-            });
-        }
-
-        // Setup Drags
-        // 1. Dragging Intro? Currently fixed at 0 in logic. Let's just allow dragging VOICE.
-        // If we drag voice, we update 'voiceOffset'
-        initDraggable('clipVoice', (time) => {
-            // Voice Offset = VoiceStart - IntroStart(0)
-            const vOff = time;
-            $('voiceOffset').value = vOff.toFixed(2);
-            $('voiceOffsetVal').textContent = vOff.toFixed(2) + 's';
-            updateSequencer(); // re-calc outro pos which depends on voice
-        });
-
-        // 2. Dragging Outro
-        initDraggable('clipOutro', (time) => {
-            // Outro Offset is relative to Voice End
-            // Time = VoiceStart + VoiceDur + OutroOffset
-            // So OutroOffset = Time - (VoiceStart + VoiceDur)
-
-            const vOff = parseFloat($('voiceOffset').value);
-            // Re-calc voice duration
-            let voiceD = 0;
-            if (voiceLibrary[selectedVoiceIndex]) {
-                const vBuf = voiceLibrary[selectedVoiceIndex].buffer;
-                const pitchSemis = parseInt($('voicePitch').value);
-                const pitchRate = Math.pow(2, pitchSemis / 12);
-                const cue = findAudioStart(vBuf);
-                voiceD = (vBuf.duration - cue) / pitchRate;
-            }
-            const buildUp = $('buildUpOn').checked ? (4 * 0.150) : 0;
-            const voiceEnd = vOff + buildUp + voiceD;
-
-            const newOffset = time - voiceEnd;
-            $('outroOffset').value = newOffset.toFixed(2);
-            $('outroOffsetVal').textContent = newOffset.toFixed(2) + 's';
-        });
-
-        // Hook into existing updates
-        ['voiceOffset', 'outroOffset', 'voicePitch', 'buildUpOn'].forEach(id => {
-            document.getElementById(id).addEventListener('input', updateSequencer);
-            document.getElementById(id).addEventListener('change', updateSequencer);
-        });
-
-        // Hook into Intro/Outro load/trim
-        // We need to call updateSequencer whenever wavesurfer region updates or file loads
-        // I will add calls to updateSequencer() in the relevant places below
-
     </script>
 </body>
 
