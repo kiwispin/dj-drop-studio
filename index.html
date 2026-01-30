@@ -1846,14 +1846,10 @@
             const files = Array.from(e.target.files);
             if (!files.length) return;
 
-            // Ask for category once
-            const cat = prompt(`Uploading ${files.length} files.\nEnter category (intro, outro, sfx, voice, bed):`, "sfx");
-            if (!cat) return; // cancelled
+            // Default to 'sfx' since usage is flexible
+            const finalCat = 'sfx';
 
-            const validCats = ['intro', 'outro', 'sfx', 'voice', 'bed'];
-            const finalCat = validCats.includes(cat.toLowerCase()) ? cat.toLowerCase() : 'sfx';
-
-            if (!confirm(`Upload ${files.length} files to '${finalCat}'?`)) return;
+            if (!confirm(`Upload ${files.length} files to Cloud Library?`)) return;
 
             let successCount = 0;
             for (const file of files) {
