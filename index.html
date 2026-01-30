@@ -1373,13 +1373,16 @@
                 const storageRef = ref(storage, storagePath);
                 const blob = await getBlob(storageRef);
 
+                // Convert Blob to File to preserve name for persistence
+                const file = new File([blob], name, { type: blob.type });
+
                 if (targetSlot === 'intro') {
-                    saveTrackToDB("intro", blob);
-                    introBuffer = await loadAudioFile(blob);
+                    saveTrackToDB("intro", file);
+                    introBuffer = await loadAudioFile(file);
                     $('introStatus').innerText = "Cloud: " + name;
                 } else {
-                    saveTrackToDB("outro", blob);
-                    outroBuffer = await loadAudioFile(blob);
+                    saveTrackToDB("outro", file);
+                    outroBuffer = await loadAudioFile(file);
                     $('outroStatus').innerText = "Cloud: " + name;
                 }
             } catch (err) {
@@ -1511,9 +1514,9 @@
                         if (type === 'outro') currentOutroFile = file;
 
                         const buff = await loadAudioFile(file);
-                        if (type === 'intro') { introBuffer = buff; $('introStatus').innerText = "Loaded: " + file.name; }
-                        if (type === 'outro') { outroBuffer = buff; $('outroStatus').innerText = "Loaded: " + file.name; }
-                        if (type === 'bed') { musicBuffer = buff; $('bedStatus').innerText = "Loaded: " + file.name; }
+                        if (type === 'intro') { introBuffer = buff; $('introStatus').innerText = "Loaded: " + (file.name || "Cloud Audio"); }
+                        if (type === 'outro') { outroBuffer = buff; $('outroStatus').innerText = "Loaded: " + (file.name || "Cloud Audio"); }
+                        if (type === 'bed') { musicBuffer = buff; $('bedStatus').innerText = "Loaded: " + (file.name || "Cloud Audio"); }
                     }
                 };
             });
