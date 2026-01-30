@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DJ Drop Studio V15 - Cloud Library</title>
+    <style>
+        /* --- GLOBAL RESET & THEME --- */
+        :root {
+            --bg: #101010;
+            --panel: #1a1a1a;
+            --surface: #252525;
+            --accent: #d946ef; /* Magenta */
+            --highlight: #06b6d4; /* Cyan */
+            --intro: #22c55e; /* Green */
+            --outro: #f97316; /* Orange */
+            --text: #f3f4f6;
+            --border: #333;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .studio-container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 20px;
+            max-width: 1250px;
+            width: 100%;
+        }
+
+        /* --- SIDEBAR & TABS --- */
+        .sidebar {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            background: transparent;
+            color: #888;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        
+        .tab.active {
+            color: var(--highlight);
+            border-bottom-color: var(--highlight);
+        }
+
+        .tab-content {
+            flex: 1;
+            overflow-y: auto;
+            display: none;
+        }
+        .tab-content.active { display: block; }
+
+        /* LISTS */
+        .drop-zone {
+            border: 2px dashed #444;
+            border-radius: 6px;
+            padding: 20px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #888;
+            cursor: pointer;
+            transition: 0.2s;
+            background: #151515;
+            margin-bottom: 15px;
+        }
+        .drop-zone:hover { border-color: var(--highlight); color: white; }
+
+        .voice-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .voice-item {
+            background: var(--surface);
+            padding: 10px;
+            margin-bottom: 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+        .voice-item:hover { background: #333; }
+        .voice-item.active { border-left-color: var(--accent); background: #3a203a; }
+        
+        /* Cloud Items */
+        .cloud-item {
+            background: #181818;
+            border: 1px solid #333;
+            color: #ccc;
+        }
+        .cloud-item:hover { border-color: var(--highlight); }
+        .cloud-tag { 
+            font-size: 0.65rem; padding: 2px 4px; border-radius: 3px; 
+            text-transform: uppercase; margin-right: 5px; 
+        }
+        .tag-intro { background: rgba(34, 197, 94, 0.2); color: var(--intro); }
+        .tag-outro { background: rgba(249, 115, 22, 0.2); color: var(--outro); }
+
+        /* --- MAIN MIXER --- */
+        .mixer {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+        h1 { margin: 0; color: var(--text); font-size: 1.5rem; letter-spacing: -0.5px; }
+        .badge { background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; vertical-align: middle; }
+
+        /* TRACK STYLING */
+        .track {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .track-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+        .track-title { font-weight: bold; font-size: 0.9rem; text-transform: uppercase; color: #ccc; display: flex; align-items: center; gap: 8px; }
+        
+        .track-row {
+            display: flex;
+            gap: 20px;
+            align-items: center; 
+        }
+        .track-col-left { flex: 1; }
+        .track-col-right { flex: 1; }
+
+        /* FX GRID */
+        .fx-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .fx-card {
+            background: #222;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .fx-head {
+            font-size: 0.75rem;
+            color: var(--highlight);
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+        }
+
+        /* CONTROLS */
+        .control-group { margin-bottom: 12px; }
+        .control-header { display: flex; justify-content: space-between; font-size: 0.75rem; color: #aaa; margin-bottom: 6px; }
+        .val-display { color: var(--highlight); font-family: monospace; font-weight: bold; }
+        .param-text-row { display: flex; justify-content: space-between; font-size: 0.8rem; color: #aaa; margin-bottom: 8px; }
+
+        input[type="range"] {
+            width: 100%; height: 6px; background: #333; border-radius: 3px; accent-color: var(--highlight);
+            -webkit-appearance: none; display: block;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: white; cursor: pointer;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5); transition: transform 0.1s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.1); }
+        input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+        input[type="file"] { font-size: 0.8rem; color: #888; width: 100%; background: #222; padding: 10px; border-radius: 4px; border: 1px solid #444; }
+
+        .file-status {
+            font-size: 0.7rem; color: var(--highlight); margin-top: 6px; font-style: italic; min-height: 1rem; padding-left: 2px;
+        }
+
+        /* CLOUD BUTTONS */
+        .cloud-btn {
+            background: #333; color: #888; border: 1px solid #444; padding: 5px 10px;
+            font-size: 0.7rem; border-radius: 4px; cursor: pointer; margin-left: 10px;
+            display: flex; align-items: center; gap: 5px;
+        }
+        .cloud-btn:hover { background: var(--highlight); color: black; border-color: var(--highlight); }
+        .cloud-btn svg { width: 12px; height: 12px; fill: currentColor; }
+
+        /* ACTION BAR */
+        .transport {
+            background: var(--panel); padding: 20px; border-radius: 8px; border: 1px solid var(--border);
+            display: flex; gap: 20px; align-items: center;
+        }
+        .main-btn {
+            flex: 1; padding: 16px; border: none; border-radius: 6px; font-weight: bold; font-size: 1rem; text-transform: uppercase;
+            cursor: pointer; transition: 0.2s; display: flex; justify-content: center; align-items: center; gap: 10px;
+        }
+        .btn-gen { background: linear-gradient(135deg, var(--accent), #b026ff); color: white; box-shadow: 0 4px 15px rgba(217, 70, 239, 0.3); }
+        .btn-gen:hover { transform: translateY(-1px); filter: brightness(1.1); }
+        .btn-gen:disabled { filter: grayscale(1); opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-save { background: #333; color: white; flex: 0.5; }
+        .btn-save:hover { background: #444; }
+
+        /* VIZ */
+        .viz-container {
+            flex: 1; height: 40px; background: #111; border-radius: 4px; position: relative; overflow: hidden; border: 1px solid #333;
+        }
+        .viz-progress {
+            position: absolute; top: 0; left: 0; bottom: 0; width: 0%;
+            background: rgba(255, 255, 255, 0.1); border-right: 2px solid var(--accent); z-index: 2;
+            transition: width 0.1s linear;
+        }
+        .viz-text {
+            position: absolute; width: 100%; text-align: center; line-height: 40px; font-size: 0.8rem; color: #666; z-index: 1;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="studio-container">
+    
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <!-- TABS -->
+        <div class="tabs">
+            <div class="tab active" id="tabLocal">My Crate</div>
+            <div class="tab" id="tabCloud">Cloud SFX</div>
+        </div>
+
+        <!-- LOCAL CONTENT -->
+        <div id="contentLocal" class="tab-content active">
+            <div class="crate-header">Local Voices</div>
+            <div class="drop-zone" id="localDropZone">
+                <div>📂 Click to Upload</div>
+                <div style="font-size:0.7rem; margin-top:5px; color:#555">MP3 / WAV Supported</div>
+                <input type="file" id="voiceUploader" multiple accept="audio/*" style="display:none">
+            </div>
+            <ul class="voice-list" id="voiceList">
+                <li style="padding:15px; color:#444; font-size:0.8rem; text-align:center; font-style:italic" id="emptyMsg">
+                    Library Empty
+                </li>
+            </ul>
+            <div style="margin-top:auto; padding-top:10px; border-top:1px solid #333; font-size:0.7rem; color:#666; text-align:center;">
+                Files saved to Browser Memory
+            </div>
+        </div>
+
+        <!-- CLOUD CONTENT -->
+        <div id="contentCloud" class="tab-content">
+            <div class="crate-header">Community Library</div>
+            <p style="font-size:0.7rem; color:#666; padding:0 10px;">
+                Shared SFX from other users. Click to load into Intro/Outro slots.
+            </p>
+            <ul class="voice-list" id="cloudList">
+                <li style="padding:15px; color:#444; font-size:0.8rem; text-align:center;">Loading...</li>
+            </ul>
+        </div>
+    </aside>
+
+    <!-- MAIN AREA -->
+    <main class="mixer">
+        <div class="header-section">
+            <h1>DJ Drop Studio <span class="badge">V15 CLOUD</span></h1>
+        </div>
+
+        <!-- 1. INTRO SFX -->
+        <div class="track" style="border-left: 4px solid var(--intro);">
+            <div class="track-header">
+                <div class="track-title">1. Intro SFX</div>
+                <!-- CLOUD UPLOAD BUTTON -->
+                <button class="cloud-btn" id="uploadIntroBtn" title="Upload current Intro to Cloud Library">
+                    <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5z"/></svg>
+                    Share
+                </button>
+            </div>
+            <div class="track-row">
+                <div class="track-col-left">
+                    <input type="file" id="introFile" accept="audio/*">
+                    <div id="introStatus" class="file-status"></div>
+                </div>
+                <div class="track-col-right">
+                    <div class="control-header">
+                        <span>Intro Volume</span>
+                        <span class="val-display" id="introVolVal">0.8</span>
+                    </div>
+                    <input type="range" id="introVol" min="0" max="1.5" step="0.1" value="0.8">
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. VOICE TRACK -->
+        <div class="track" style="border-left: 4px solid var(--accent);">
+            <div class="track-header">
+                <div class="track-title">2. Voice Core</div>
+                <div id="selectedVoiceName" style="font-size:0.85rem; color:var(--accent);">No Voice Selected</div>
+            </div>
+
+            <!-- PRO FX RACK -->
+            <div class="fx-section">
+                <!-- Build Up -->
+                <div class="fx-card">
+                    <div class="fx-head">
+                        <span>🚀 Build-Up</span>
+                        <input type="checkbox" id="buildUpOn" checked>
+                    </div>
+                    <div class="param-text-row">
+                        <span>Stutters</span>
+                        <span style="color:var(--highlight)">4x</span>
+                    </div>
+                    <div class="param-text-row">
+                        <span>FX Chain</span>
+                        <span style="font-size:0.7rem">Pitch + Filter + Flange</span>
+                    </div>
+                </div>
+                
+                <!-- Pro Width & EQ -->
+                <div class="fx-card">
+                    <div class="fx-head">
+                        <span>💎 Pro Width & EQ</span>
+                        <input type="checkbox" id="widthOn" checked>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-header">
+                            <span>Stereo Width</span>
+                            <span class="val-display" id="widthVal">50%</span>
+                        </div>
+                        <input type="range" id="widthAmt" min="0" max="1" step="0.1" value="0.5">
+                    </div>
+                    <div class="param-text-row">
+                        <span>Radio EQ</span>
+                        <span style="color:var(--highlight)">Presence + Air</span>
+                    </div>
+                </div>
+
+                <!-- Tail FX -->
+                <div class="fx-card">
+                    <div class="fx-head">
+                        <span>🌌 Tail Processing</span>
+                        <input type="checkbox" id="tailOn" checked>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-header">
+                            <span>Tail Start</span>
+                            <span class="val-display" id="tailStartVal">60%</span>
+                        </div>
+                        <input type="range" id="tailStart" min="0.1" max="0.9" step="0.1" value="0.6">
+                    </div>
+                    <div class="control-group">
+                        <div class="control-header">
+                            <span>Wet Level</span>
+                            <span class="val-display" id="tailMixVal">50%</span>
+                        </div>
+                        <input type="range" id="tailMix" min="0" max="1" step="0.1" value="0.5">
+                    </div>
+                </div>
+
+                <!-- Master Voice Control -->
+                <div class="fx-card">
+                    <div class="fx-head">
+                        <span>🎚️ Master Control</span>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-header">
+                            <span>Intro Offset (Start)</span>
+                            <span class="val-display" id="offsetVal">0.0s</span>
+                        </div>
+                        <input type="range" id="voiceOffset" min="-1" max="10" step="0.1" value="0">
+                    </div>
+                    <div class="control-group">
+                        <div class="control-header">
+                            <span>Voice Volume</span>
+                            <span class="val-display" id="voiceVolVal">1.0</span>
+                        </div>
+                        <input type="range" id="voiceVol" min="0" max="1.5" step="0.1" value="1.0">
+                    </div>
+                    <div class="control-group">
+                        <div class="control-header">
+                            <span>Pitch Shift</span>
+                            <span class="val-display" id="pitchVal">0st</span>
+                        </div>
+                        <input type="range" id="voicePitch" min="-12" max="12" step="1" value="0">
+                    </div>
+                    <div class="control-group">
+                        <div class="control-header">
+                            <span>Auto-End Trim</span>
+                            <span class="val-display" id="trimVal">0.0s</span>
+                        </div>
+                        <input type="range" id="endTrim" min="-10" max="5" step="0.5" value="0">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. OUTRO SFX -->
+        <div class="track" style="border-left: 4px solid var(--outro);">
+            <div class="track-header">
+                <div class="track-title">3. Outro SFX</div>
+                <!-- CLOUD UPLOAD BUTTON -->
+                <button class="cloud-btn" id="uploadOutroBtn" title="Upload current Outro to Cloud Library">
+                    <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5z"/></svg>
+                    Share
+                </button>
+            </div>
+            <div class="track-row">
+                <div class="track-col-left">
+                    <input type="file" id="outroFile" accept="audio/*">
+                    <div id="outroStatus" class="file-status"></div>
+                </div>
+                <div class="track-col-right">
+                    <div class="control-group">
+                        <div class="control-header">
+                            <span>Outro Offset</span>
+                            <span class="val-display" id="outroOffsetVal">0.0s</span>
+                        </div>
+                        <input type="range" id="outroOffset" min="-5" max="5" step="0.1" value="0">
+                    </div>
+                    <div class="control-group">
+                        <div class="control-header">
+                            <span>Outro Volume</span>
+                            <span class="val-display" id="outroVolVal">0.8</span>
+                        </div>
+                        <input type="range" id="outroVol" min="0" max="1.5" step="0.1" value="0.8">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. MUSIC BED -->
+        <div class="track" style="border-left: 4px solid var(--highlight);">
+            <div class="track-header">
+                <div class="track-title">4. Music Bed</div>
+                <label style="font-size:0.8rem; cursor:pointer; display:flex; align-items:center; gap:5px;">
+                    <input type="checkbox" id="autoDuck" checked> Auto-Duck
+                </label>
+            </div>
+            <div class="track-row">
+                <div class="track-col-left">
+                    <input type="file" id="bedFile" accept="audio/*">
+                    <div id="bedStatus" class="file-status"></div>
+                </div>
+                <div class="track-col-right">
+                    <div class="control-header">
+                        <span>Music Volume</span>
+                        <span class="val-display" id="bedVolVal">0.5</span>
+                    </div>
+                    <input type="range" id="bedVol" min="0" max="1" step="0.1" value="0.5">
+                </div>
+            </div>
+        </div>
+
+        <!-- TRANSPORT -->
+        <div class="transport">
+            <div class="viz-container">
+                <div class="viz-text" id="statusText">Ready to Render</div>
+                <div class="viz-progress" id="progressBar"></div>
+            </div>
+            <button class="main-btn btn-gen" id="generateBtn">
+                <span>▶ Render & Play</span>
+            </button>
+            <button class="main-btn btn-save" id="downloadBtn" disabled>
+                <span>⬇ Save</span>
+            </button>
+        </div>
+
+    </main>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // --- FIREBASE INIT ---
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    
+    // Auth & Load
+    const initAuth = async () => {
+        const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        if (token) await signInWithCustomToken(auth, token);
+        else await signInAnonymously(auth);
+        
+        loadCloudLibrary();
+    };
+    initAuth();
+
+    // --- DOM REFERENCES (Since module scope is isolated) ---
+    const $ = (id) => document.getElementById(id);
+    
+    // UI Event Binding (Manual because module)
+    $('tabLocal').onclick = () => switchTab('local');
+    $('tabCloud').onclick = () => switchTab('cloud');
+    $('localDropZone').onclick = () => $('voiceUploader').click();
+    
+    // Slider Updates
+    const bindSlider = (id, suffix='') => {
+        $(id).oninput = (e) => {
+            const val = e.target.value;
+            const displayId = id.endsWith('Amt') ? 'widthVal' : (id + 'Val'); // special case
+            const el = $(displayId);
+            if(el) {
+                if(id === 'widthAmt' || id === 'tailStart' || id === 'tailMix') el.innerText = Math.round(val * 100) + '%';
+                else if(id === 'voiceOffset' || id === 'outroOffset' || id === 'endTrim') el.innerText = (val > 0 ? '+' : '') + val + 's';
+                else if(id === 'voicePitch') el.innerText = (val > 0 ? '+' : '') + val + 'st';
+                else el.innerText = val;
+            }
+        };
+    }
+    ['introVol','voiceVol','voicePitch','voiceOffset','endTrim','outroVol','outroOffset','bedVol','widthAmt','tailStart','tailMix'].forEach(id => bindSlider(id));
+
+    function switchTab(mode) {
+        $('tabLocal').classList.toggle('active', mode === 'local');
+        $('tabCloud').classList.toggle('active', mode === 'cloud');
+        $('contentLocal').classList.toggle('active', mode === 'local');
+        $('contentCloud').classList.toggle('active', mode === 'cloud');
+    }
+
+    // --- CLOUD LOGIC ---
+    function loadCloudLibrary() {
+        if(!auth.currentUser) return;
+        const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'sfx_library'));
+        
+        onSnapshot(q, (snapshot) => {
+            const list = $('cloudList');
+            list.innerHTML = '';
+            if(snapshot.empty) {
+                list.innerHTML = '<li style="padding:10px;text-align:center;font-size:0.8rem;color:#666">Library Empty.<br>Be the first to share!</li>';
+                return;
+            }
+            
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const li = document.createElement('li');
+                li.className = 'voice-item cloud-item';
+                const tagClass = data.type === 'intro' ? 'tag-intro' : 'tag-outro';
+                
+                li.innerHTML = `
+                    <div style="display:flex; align-items:center;">
+                        <span class="cloud-tag ${tagClass}">${data.type}</span>
+                        <span>${data.name}</span>
+                    </div>
+                    <span style="font-size:0.7rem; color:#666">Load</span>
+                `;
+                li.onclick = () => loadFromCloud(data.data, data.name, data.type);
+                list.appendChild(li);
+            });
+        });
+    }
+
+    async function uploadToCloud(file, type) {
+        if(!auth.currentUser) return alert("Not connected to cloud.");
+        if(file.size > 800000) return alert("File too large for Cloud Library (Max 800KB). Use local only.");
+        
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base64 = e.target.result;
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'sfx_library'), {
+                    name: file.name,
+                    type: type, // 'intro' or 'outro'
+                    data: base64,
+                    uploadedAt: Date.now()
+                });
+                alert("Uploaded to Community Library!");
+                switchTab('cloud');
+            } catch(err) {
+                console.error(err);
+                alert("Upload failed.");
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function loadFromCloud(base64, name, type) {
+        // Convert Base64 to Blob -> ArrayBuffer -> Decode
+        const res = await fetch(base64);
+        const blob = await res.blob();
+        
+        // Save to local state (same as if user uploaded file)
+        if(type === 'intro') {
+            saveTrackToDB("intro", blob);
+            introBuffer = await loadAudioFile(blob);
+            $('introStatus').innerText = "Cloud: " + name;
+        } else {
+            saveTrackToDB("outro", blob);
+            outroBuffer = await loadAudioFile(blob);
+            $('outroStatus').innerText = "Cloud: " + name;
+        }
+    }
+
+    // --- AUDIO CORE ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioContext();
+    const dest = ctx.createMediaStreamDestination(); 
+    
+    // State & DB (IndexedDB for Local)
+    let voiceLibrary = []; 
+    let selectedVoiceIndex = -1;
+    let musicBuffer = null;
+    let introBuffer = null;
+    let outroBuffer = null;
+    let recorder = null;
+    let audioChunks = [];
+    let reverbBuffer = null;
+    
+    // File Objects for Upload
+    let currentIntroFile = null;
+    let currentOutroFile = null;
+
+    // -- INDEXEDDB --
+    let idb;
+    const DB_NAME = "DJDropStudioDB";
+    const DB_VERSION = 1;
+
+    function initIDB() {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if(!db.objectStoreNames.contains("tracks")) db.createObjectStore("tracks");
+            if(!db.objectStoreNames.contains("voices")) db.createObjectStore("voices", { autoIncrement: true });
+        };
+        req.onsuccess = (e) => {
+            idb = e.target.result;
+            loadSavedAssets();
+        };
+    }
+    initIDB();
+
+    function saveTrackToDB(key, file) {
+        if(!idb) return;
+        const tx = idb.transaction("tracks", "readwrite");
+        tx.objectStore("tracks").put(file, key);
+    }
+
+    function saveVoiceToDB(file) {
+        if(!idb) return;
+        const tx = idb.transaction("voices", "readwrite");
+        tx.objectStore("voices").add({ name: file.name, blob: file });
+    }
+
+    async function loadSavedAssets() {
+        if(!idb) return;
+        const tx = idb.transaction("tracks", "readonly");
+        const store = tx.objectStore("tracks");
+
+        ['intro', 'outro', 'bed'].forEach(type => {
+            const req = store.get(type);
+            req.onsuccess = async () => {
+                if(req.result) {
+                    const file = req.result;
+                    if(type === 'intro') currentIntroFile = file;
+                    if(type === 'outro') currentOutroFile = file;
+                    
+                    const buff = await loadAudioFile(file);
+                    if(type === 'intro') { introBuffer = buff; $('introStatus').innerText = "Loaded: " + file.name; }
+                    if(type === 'outro') { outroBuffer = buff; $('outroStatus').innerText = "Loaded: " + file.name; }
+                    if(type === 'bed') { musicBuffer = buff; $('bedStatus').innerText = "Loaded: " + file.name; }
+                }
+            };
+        });
+
+        // Voices
+        const vTx = idb.transaction("voices", "readonly");
+        const vStore = vTx.objectStore("voices");
+        const vReq = vStore.getAll();
+        vReq.onsuccess = async () => {
+            const voices = vReq.result;
+            if(voices && voices.length > 0) {
+                $('emptyMsg').style.display = 'none';
+                for(let v of voices) {
+                    const buff = await loadAudioFile(v.blob);
+                    if(buff) {
+                        const id = voiceLibrary.length;
+                        voiceLibrary.push({ name: v.name, buffer: buff });
+                        addVoiceToUI(v.name, id, buff.duration);
+                    }
+                }
+                if(voiceLibrary.length > 0) selectVoice(0);
+            }
+        };
+    }
+
+    // -- AUDIO HELPERS --
+    reverbBuffer = createReverbImpulse(2.0); 
+
+    async function loadAudioFile(file) {
+        if(!file) return null;
+        const ab = await file.arrayBuffer();
+        return await ctx.decodeAudioData(ab);
+    }
+
+    function findAudioStart(buffer) {
+        const data = buffer.getChannelData(0);
+        const threshold = 0.015; 
+        for (let i = 0; i < data.length; i++) {
+            if (Math.abs(data[i]) > threshold) return i / buffer.sampleRate;
+        }
+        return 0;
+    }
+
+    function createReverbImpulse(duration) {
+        const len = ctx.sampleRate * duration;
+        const buffer = ctx.createBuffer(2, len, ctx.sampleRate);
+        for (let c = 0; c < 2; c++) {
+            const data = buffer.getChannelData(c);
+            for (let i = 0; i < len; i++) {
+                const decay = Math.pow(1 - i / len, 3);
+                data[i] = (Math.random() * 2 - 1) * decay;
+            }
+        }
+        return buffer;
+    }
+
+    function addVoiceToUI(name, id, duration) {
+        const list = $('voiceList');
+        const li = document.createElement('li');
+        li.className = 'voice-item';
+        li.innerHTML = `<span>${name}</span> <span style="font-size:0.7rem; color:#666">${duration.toFixed(1)}s</span>`;
+        li.onclick = () => selectVoice(id);
+        li.dataset.id = id;
+        list.appendChild(li);
+    }
+
+    function selectVoice(idx) {
+        selectedVoiceIndex = idx;
+        document.querySelectorAll('.voice-item').forEach(el => el.classList.remove('active'));
+        const el = document.querySelector(`.voice-item:nth-child(${idx + 2})`); // +2 for hidden header/empty msg
+        // Simplified selection logic as querySelector nth-child is tricky with dynamic lists
+        // Just re-render active state visually
+        Array.from(document.querySelectorAll('.voice-item')).forEach((item, i) => {
+             if(item.dataset.id == idx) item.classList.add('active');
+        });
+        $('selectedVoiceName').textContent = voiceLibrary[idx].name;
+    }
+
+    // -- EVENT LISTENERS --
+    $('voiceUploader').addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if(!files.length) return;
+        $('emptyMsg').style.display = 'none';
+        for(let file of files) {
+            saveVoiceToDB(file);
+            const buff = await loadAudioFile(file);
+            if(buff) {
+                const id = voiceLibrary.length;
+                voiceLibrary.push({ name: file.name, buffer: buff });
+                addVoiceToUI(file.name, id, buff.duration);
+            }
+        }
+        if(selectedVoiceIndex === -1 && voiceLibrary.length > 0) selectVoice(0);
+    });
+
+    $('introFile').addEventListener('change', async (e) => {
+        const f = e.target.files[0]; if(!f) return;
+        currentIntroFile = f;
+        saveTrackToDB("intro", f);
+        introBuffer = await loadAudioFile(f);
+        $('introStatus').innerText = "Loaded: " + f.name;
+    });
+
+    $('outroFile').addEventListener('change', async (e) => {
+        const f = e.target.files[0]; if(!f) return;
+        currentOutroFile = f;
+        saveTrackToDB("outro", f);
+        outroBuffer = await loadAudioFile(f);
+        $('outroStatus').innerText = "Loaded: " + f.name;
+    });
+
+    $('bedFile').addEventListener('change', async (e) => {
+        const f = e.target.files[0]; if(!f) return;
+        saveTrackToDB("bed", f);
+        musicBuffer = await loadAudioFile(f);
+        $('bedStatus').innerText = "Loaded: " + f.name;
+    });
+
+    // CLOUD UPLOAD HANDLERS
+    $('uploadIntroBtn').onclick = () => {
+        if(currentIntroFile) uploadToCloud(currentIntroFile, 'intro');
+        else alert("No Intro file loaded locally.");
+    };
+    $('uploadOutroBtn').onclick = () => {
+        if(currentOutroFile) uploadToCloud(currentOutroFile, 'outro');
+        else alert("No Outro file loaded locally.");
+    };
+
+    // -- SEQUENCER --
+    $('generateBtn').addEventListener('click', async () => {
+        if(ctx.state === 'suspended') await ctx.resume();
+        if(selectedVoiceIndex === -1) { alert("Select a voice!"); return; }
+
+        const btn = $('generateBtn');
+        const status = $('statusText');
+        const progress = $('progressBar');
+        
+        btn.disabled = true;
+        status.textContent = "Rendering...";
+        progress.style.width = "0%";
+
+        const masterComp = ctx.createDynamicsCompressor();
+        masterComp.threshold.value = -12; masterComp.knee.value = 30; masterComp.ratio.value = 4; masterComp.attack.value = 0.003; masterComp.release.value = 0.25;
+        const masterGain = ctx.createGain(); masterGain.gain.value = 1.0;
+        masterComp.connect(masterGain); masterGain.connect(ctx.destination); masterGain.connect(dest);
+
+        audioChunks = [];
+        recorder = new MediaRecorder(dest.stream);
+        recorder.ondataavailable = e => audioChunks.push(e.data);
+        recorder.start();
+
+        const t0 = ctx.currentTime + 0.2;
+        const introDur = introBuffer ? introBuffer.duration : 0;
+        const voiceObj = voiceLibrary[selectedVoiceIndex];
+        const cuePoint = findAudioStart(voiceObj.buffer);
+        
+        const pitchSemis = parseInt($('voicePitch').value);
+        const pitchRate = Math.pow(2, pitchSemis / 12);
+        
+        const introOffset = parseFloat($('voiceOffset').value);
+        const outroOffset = parseFloat($('outroOffset').value);
+        const endTrim = parseFloat($('endTrim').value);
+        
+        const buildUpOn = $('buildUpOn').checked;
+        const widthOn = $('widthOn').checked;
+        const tailOn = $('tailOn').checked;
+        
+        const stutterCount = 4; const stutterLen = 0.150;
+        const buildUpDur = buildUpOn ? (stutterCount * stutterLen) : 0;
+        const rawVoiceDur = (voiceObj.buffer.duration - cuePoint) / pitchRate;
+        const totalVoiceSectionDur = buildUpDur + rawVoiceDur;
+
+        // TIMELINE
+        const timeIntro = t0;
+        let timeVoice = t0 + introOffset;
+        if(timeVoice < t0) timeVoice = t0; 
+        const absVoiceStart = timeVoice + buildUpDur;
+        const timeOutro = timeVoice + totalVoiceSectionDur + outroOffset;
+
+        // Intro
+        if(introBuffer) {
+            const src = ctx.createBufferSource(); src.buffer = introBuffer;
+            const g = ctx.createGain(); g.gain.value = $('introVol').value;
+            src.connect(g).connect(masterComp); src.start(timeIntro);
+        }
+
+        // Music Bed
+        let bedNode, bedGain;
+        if(musicBuffer) {
+            bedNode = ctx.createBufferSource(); bedNode.buffer = musicBuffer;
+            bedGain = ctx.createGain(); bedGain.gain.setValueAtTime(parseFloat($('bedVol').value), t0);
+            bedNode.connect(bedGain).connect(masterComp); bedNode.start(t0);
+        }
+
+        // Voice
+        const voiceVol = parseFloat($('voiceVol').value);
+        if(buildUpOn) {
+            const bg = ctx.createGain(); bg.gain.value = voiceVol;
+            const dly = ctx.createDelay(); dly.delayTime.value = 0.005;
+            const lfo = ctx.createOscillator(); lfo.frequency.value = 3; 
+            const dep = ctx.createGain(); dep.gain.value = 0.002;
+            lfo.connect(dep).connect(dly.delayTime); lfo.start(t0);
+            const hpf = ctx.createBiquadFilter(); hpf.type='highpass';
+            hpf.frequency.setValueAtTime(200, timeVoice); hpf.frequency.exponentialRampToValueAtTime(1000, timeVoice+buildUpDur);
+            hpf.connect(dly).connect(bg).connect(masterComp);
+
+            const startP = -300; const endP = 0;
+            for(let i=0; i<stutterCount; i++) {
+                const s = ctx.createBufferSource(); s.buffer = voiceObj.buffer;
+                const p = i/(stutterCount-1);
+                s.detune.value = (startP + (p*(endP-startP))) + (pitchSemis*100);
+                s.connect(hpf); s.start(timeVoice+(i*stutterLen), cuePoint, stutterLen);
+            }
+        }
+
+        const main = ctx.createBufferSource(); main.buffer = voiceObj.buffer;
+        main.detune.value = pitchSemis * 100;
+        let head = main;
+
+        if(widthOn) {
+            const pEQ = ctx.createBiquadFilter(); pEQ.type='peaking'; pEQ.frequency.value=3000; pEQ.gain.value=4;
+            const aEQ = ctx.createBiquadFilter(); aEQ.type='highshelf'; aEQ.frequency.value=10000; aEQ.gain.value=5;
+            main.connect(pEQ).connect(aEQ); head=aEQ;
+            
+            // Width FX
+            const wAmt = parseFloat($('widthAmt').value);
+            if(wAmt>0) {
+                const wg = ctx.createGain(); wg.gain.value = wAmt*0.6;
+                const sL = ctx.createBufferSource(); sL.buffer=voiceObj.buffer; sL.detune.value=(pitchSemis*100)-12;
+                const sR = ctx.createBufferSource(); sR.buffer=voiceObj.buffer; sR.detune.value=(pitchSemis*100)+12;
+                const dL=ctx.createDelay(); dL.delayTime.value=0.018; const pL=ctx.createStereoPanner(); pL.pan.value=-1;
+                const dR=ctx.createDelay(); dR.delayTime.value=0.028; const pR=ctx.createStereoPanner(); pR.pan.value=1;
+                sL.connect(dL).connect(pL).connect(wg); sR.connect(dR).connect(pR).connect(wg); wg.connect(masterComp);
+                sL.start(absVoiceStart, cuePoint); sR.start(absVoiceStart, cuePoint);
+            }
+        }
+        
+        const vg = ctx.createGain(); vg.gain.value=voiceVol;
+        head.connect(vg).connect(masterComp);
+
+        if(tailOn) {
+            const startPct = parseFloat($('tailStart').value);
+            const mix = parseFloat($('tailMix').value);
+            const ts = ctx.createGain(); ts.gain.value=0;
+            const dL = ctx.createDelay(); dL.delayTime.value=0.3; const dR=ctx.createDelay(); dR.delayTime.value=0.45;
+            const fbL = ctx.createGain(); fbL.gain.value=0.4; const fbR=ctx.createGain(); fbR.gain.value=0.4;
+            const m = ctx.createChannelMerger(2);
+            ts.connect(dL); ts.connect(dR); dL.connect(fbL).connect(dR); dR.connect(fbR).connect(dL);
+            dL.connect(m,0,0); dR.connect(m,0,1);
+            const rev = ctx.createConvolver(); rev.buffer = reverbBuffer;
+            m.connect(masterComp); ts.connect(rev).connect(masterComp); vg.connect(ts);
+            const tStart = absVoiceStart + (rawVoiceDur * startPct);
+            ts.gain.setValueAtTime(0, tStart); ts.gain.linearRampToValueAtTime(mix, absVoiceStart+rawVoiceDur);
+        }
+        main.start(absVoiceStart, cuePoint);
+
+        // Outro
+        if(outroBuffer) {
+            const src = ctx.createBufferSource(); src.buffer = outroBuffer;
+            const g = ctx.createGain(); g.gain.value = $('outroVol').value;
+            src.connect(g).connect(masterComp);
+            let start = timeOutro; if(start<t0) start=t0;
+            src.start(start);
+        }
+
+        // Ducking
+        if(musicBuffer && $('autoDuck').checked) {
+            const start = timeVoice; const end = timeOutro; const v = parseFloat($('bedVol').value);
+            bedGain.gain.setValueAtTime(v, start); bedGain.gain.linearRampToValueAtTime(v*0.3, start+0.3);
+            bedGain.gain.setValueAtTime(v*0.3, end); bedGain.gain.linearRampToValueAtTime(v, end+1.0);
+        }
+
+        // Cleanup
+        progress.style.width="100%";
+        const endIntro = timeIntro + (introBuffer ? introBuffer.duration : 0);
+        let realOutroStart = timeOutro; if(realOutroStart<t0) realOutroStart=t0;
+        const endOutro = realOutroStart + (outroBuffer ? outroBuffer.duration : 0);
+        const naturalEnd = Math.max(endIntro, endOutro);
+        
+        let fadeStart = naturalEnd + endTrim;
+        if(fadeStart < t0) fadeStart = t0 + 1;
+
+        masterGain.gain.setValueAtTime(1, fadeStart);
+        masterGain.gain.linearRampToValueAtTime(0, fadeStart+2.0);
+
+        const stopTime = fadeStart + 2.1;
+        setTimeout(() => {
+            recorder.stop();
+            if(bedNode) bedNode.stop(ctx.currentTime+0.1);
+            btn.disabled = false; status.textContent = "Done!"; $('downloadBtn').disabled = false; progress.style.width="0%";
+        }, (stopTime - t0) * 1000);
+    });
+
+    $('downloadBtn').onclick = () => {
+        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `dj-drop-${Date.now()}.webm`; a.click();
+    };
+</script>
+</body>
+</html>
