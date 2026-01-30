@@ -629,12 +629,10 @@
             position: relative;
             background: rgba(0, 0, 0, 0.4);
             border-radius: 6px;
-            overflow-x: auto;
-            /* Allow scrolling if long */
-            overflow-y: hidden;
+            overflow: hidden;
+            /* Clips are contained */
             padding: 8px 0;
-            min-height: 220px;
-            /* Taller for waveforms */
+            min-height: 120px;
         }
 
         .seq-ruler {
@@ -650,59 +648,10 @@
         }
 
         .seq-track {
-            height: 64px;
-            /* Taller for waveform */
-            margin-bottom: 8px;
+            height: 28px;
+            margin-bottom: 4px;
             position: relative;
             width: 100%;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        /* The container for the waveform instance */
-        .seq-wave-container {
-            position: absolute;
-            top: 0;
-            height: 100%;
-            cursor: grab;
-            border-radius: 4px;
-            overflow: hidden;
-            /* important for region containment */
-            transition: box-shadow 0.2s;
-            /* Border for visibility even if silent */
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .seq-wave-container:active {
-            cursor: grabbing;
-            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
-            z-index: 10;
-        }
-
-        /* Playhead */
-        .seq-playhead {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background: #fff;
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-            pointer-events: none;
-            z-index: 50;
-            transform: translateX(-50%);
-            display: none;
-            /* hidden until play */
-        }
-
-        /* Time Markers */
-        .seq-time-marker {
-            position: absolute;
-            top: 2px;
-            font-size: 0.6rem;
-            color: rgba(255, 255, 255, 0.3);
-            pointer-events: none;
-            border-left: 1px solid rgba(255, 255, 255, 0.1);
-            height: 100%;
-            padding-left: 4px;
         }
 
         .seq-clip {
@@ -1108,49 +1057,24 @@
                 <!-- === VISUAL SEQUENCER === -->
                 <div class="sequencer-container">
                     <div class="seq-header">
-                        <div style="display:flex; flex-direction:column; gap:2px">
-                            <span>Sequencer</span>
-                            <span style="font-size:0.65rem; font-weight:400; opacity:0.6">Drag track to move • Drag
-                                edges to trim</span>
-                        </div>
-                        <div class="seq-controls">
-                            <button class="seq-btn" id="seqStopBtn">
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                    <path d="M6 6h12v12H6z" />
-                                </svg>
-                                STOP
-                            </button>
-                            <button class="seq-btn" id="seqPlayBtn">
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                    <path d="M8 5v14l11-7z" />
-                                </svg>
-                                PLAY SEQUENCE
-                            </button>
-                        </div>
+                        <span>Timeline Arranger</span>
+                        <span style="font-size:0.7rem; font-weight:400; opacity:0.7">Drag clips to adjust timing</span>
                     </div>
                     <div class="seq-timeline" id="seqTimeline">
                         <div class="seq-ruler"></div>
-                        <div class="seq-playhead" id="seqPlayhead"></div>
 
                         <!-- Tracks -->
-                        <!-- INTRO -->
                         <div class="seq-track">
-                            <div class="seq-wave-container" id="seqWaveIntro" style="border-color:var(--intro)"></div>
+                            <div class="seq-clip clip-intro" id="clipIntro" data-track="intro">INTRO</div>
                         </div>
-
-                        <!-- VOICE -->
                         <div class="seq-track">
-                            <div class="seq-wave-container" id="seqWaveVoice" style="border-color:var(--voice)"></div>
+                            <div class="seq-clip clip-voice" id="clipVoice" data-track="voice">VOICE</div>
                         </div>
-
-                        <!-- OUTRO -->
                         <div class="seq-track">
-                            <div class="seq-wave-container" id="seqWaveOutro" style="border-color:var(--outro)"></div>
+                            <div class="seq-clip clip-outro" id="clipOutro" data-track="outro">OUTRO</div>
                         </div>
-
-                        <!-- BED (Simpler, maybe just a block or simple wave if possible) -->
-                        <div class="seq-track" style="height:32px; opacity:0.5; border-bottom:none">
-                            <div class="seq-wave-container" id="seqWaveBed" style="border-color:var(--master)"></div>
+                        <div class="seq-track" style="margin-top:8px; opacity:0.6">
+                            <div class="seq-clip clip-bed" id="clipBed" style="width:100%">MUSIC BED</div>
                         </div>
                     </div>
                 </div>
@@ -1901,50 +1825,27 @@
         let wsIntroRegion = null, wsOutroRegion = null;
         let introTrim = { start: 0, end: 0 };
         let outroTrim = { start: 0, end: 0 };
-        
-        // SEQ CONSTANTS
-        const SEQ_PX_PER_SEC = 20;
 
-        // --- TRANSPORT STATE ---
-        let isPlayingSequence = false;
-        let sequenceStartTime = 0;
-        let playheadReqId = null;
-        let playbackSource = null; // Re-declared here effectively masking outer scope if any, but global scope is shared in script.
-        // Wait, 'playbackSource' was declared at line 1692. 
-        // I should NOT re-declare it here if it's already continuous.
-        // Let's check line 1692 in Step 303.
-        // 1692:         let playbackSource = null;
-        // So I should REMOVE 'let playbackSource = null;' from here.
-        
-        // --- INIT WAVEFORM (SEQUENCER) ---
         async function initWaveform(containerId, file, type) {
             if (!file) return;
-            
-            let targetId = containerId;
-            if (type === 'intro') targetId = 'seqWaveIntro';
-            if (type === 'outro') targetId = 'seqWaveOutro';
-            if (type === 'bed') targetId = 'seqWaveBed';
+            // Clear old
+            if (type === 'intro' && wsIntro) { wsIntro.destroy(); wsIntro = null; }
+            if (type === 'outro' && wsOutro) { wsOutro.destroy(); wsOutro = null; }
 
-            const container = document.getElementById(targetId);
-            if (!container) return; 
-
-            // Clear old instances
-            if (type === 'intro' && wsIntro) { wsIntro.destroy(); wsIntro = null; wsIntroRegion = null; }
-            if (type === 'outro' && wsOutro) { wsOutro.destroy(); wsOutro = null; wsOutroRegion = null; }
-
+            const container = document.getElementById(containerId);
             container.innerHTML = '';
 
-            // Create Wavesurfer
             const ws = WaveSurfer.create({
                 container: container,
-                waveColor: type === 'intro' ? '#0ea5e9' : (type === 'outro' ? '#f43f5e' : '#06b6d4'),
+                waveColor: type === 'intro' ? '#0ea5e9' : '#f43f5e',
                 progressColor: 'rgba(255,255,255,0.3)',
-                height: 64, 
+                height: 60,
                 barWidth: 2,
                 barGap: 1,
-                cursorWidth: 0, 
+                cursorWidth: 1,
+                cursorColor: '#fff',
                 normalize: true,
-                interact: false
+                interact: false,
             });
 
             // Register Regions
@@ -1954,404 +1855,53 @@
 
             ws.on('ready', () => {
                 const dur = ws.getDuration();
-                container.style.width = (dur * SEQ_PX_PER_SEC) + 'px';
-
-                if (type === 'bed') {
-                    updateSequencerPositionsOnly();
-                    return;
-                }
-
+                // Default to full length
                 const region = wsRegions.addRegion({
                     start: 0,
                     end: dur,
                     color: 'rgba(255, 255, 255, 0.1)',
                     drag: true,
-                    resize: true,
-                    handleStyle: {
-                        left: { width:'6px', backgroundColor:'rgba(255,255,255,0.8)' },
-                        right: { width:'6px', backgroundColor:'rgba(255,255,255,0.8)' }
-                    }
+                    resize: true
                 });
 
                 if (type === 'intro') {
-                    wsIntro = ws; wsIntroRegion = region; introTrim = { start: 0, end: dur };
+                    wsIntro = ws;
+                    wsIntroRegion = region;
+                    introTrim = { start: 0, end: dur };
                 } else {
-                    wsOutro = ws; wsOutroRegion = region; outroTrim = { start: 0, end: dur };
+                    wsOutro = ws;
+                    wsOutroRegion = region;
+                    outroTrim = { start: 0, end: dur };
                 }
 
                 region.on('update-end', () => {
                     if (type === 'intro') introTrim = { start: region.start, end: region.end };
                     else outroTrim = { start: region.start, end: region.end };
-                    updateSequencerPositionsOnly();
-                    renderedBuffer = null;
-                    $('statusText').textContent = "Changed. Re-render required.";
+                    updateSequencer();
                 });
-                
-                region.on('click', (e) => {
-                    e.stopPropagation();
+
+                // Update while dragging for smoother UI feedback (optional but good)
+                region.on('update', () => {
+                    if (type === 'intro') introTrim = { start: region.start, end: region.end };
+                    else outroTrim = { start: region.start, end: region.end };
+                    updateSequencer();
+                });
+
+                // Play on click
+                region.on('click', () => {
                     region.play();
                 });
-                
-                ws.on('audioprocess', (t) => {
-                    if (ws.isPlaying() && t >= region.end) {
+
+                // Stop at end of region (Robust manual check)
+                ws.on('audioprocess', (currentTime) => {
+                    if (ws.isPlaying() && currentTime >= region.end) {
                         ws.pause();
                     }
                 });
-                
-                updateSequencerPositionsOnly();
             });
-            
-            if (type !== 'bed') {
-                initDraggable(targetId, (time) => {
-                     // Callback when dragged
-                     if (type === 'intro') { }
-                     if (type === 'outro') {
-                         const buildUp = $('buildUpOn').checked ? (4 * 0.150) : 0;
-                         const vOff = parseFloat($('voiceOffset').value);
-                         
-                         let voiceD = 0;
-                         if (selectedVoiceIndex !== -1 && voiceLibrary[selectedVoiceIndex]) {
-                             const vBuf = voiceLibrary[selectedVoiceIndex].buffer;
-                             const pitchSemis = parseInt($('voicePitch').value);
-                             const pitchRate = Math.pow(2, pitchSemis / 12);
-                             const cue = findAudioStart(vBuf);
-                             voiceD = (vBuf.duration - cue) / pitchRate;
-                         }
-                         
-                         const voiceEnd = vOff + buildUp + voiceD;
-                         const newOffset = time - voiceEnd;
-                         
-                         $('outroOffset').value = newOffset.toFixed(2);
-                         $('outroOffsetVal').textContent = newOffset.toFixed(2) + 's';
-                         renderedBuffer = null;
-                     }
-                });
-            }
         }
 
-        // --- DRAG LOGIC ---
-        function initDraggable(elId, onDrag) {
-            const el = document.getElementById(elId);
-            if (!el) return;
-            
-            let isDragging = false;
-            let startX, startLeft;
-
-            const onMouseDown = (e) => {
-                if (e.target.classList.contains('wavesurfer-region-handle')) return;
-                
-                isDragging = true;
-                startX = e.clientX;
-                startLeft = el.offsetLeft;
-                el.style.zIndex = 100;
-                document.body.style.cursor = 'grabbing';
-                e.stopPropagation();
-            };
-            
-            // Allow overwriting existing handler
-            el.onmousedown = (e) => {
-                if (e.target.classList.contains('wavesurfer-region-handle')) return;
-                isDragging = true;
-                startX = e.clientX;
-                startLeft = el.offsetLeft;
-                el.style.zIndex = 100;
-                document.body.style.cursor = 'grabbing';
-                
-                const moveHandler = (ev) => {
-                    const dx = ev.clientX - startX;
-                    let newLeft = startLeft + dx;
-                    if (newLeft < 0) newLeft = 0;
-                    el.style.left = newLeft + 'px';
-                    onDrag(newLeft / SEQ_PX_PER_SEC);
-                };
-                
-                const upHandler = () => {
-                    isDragging = false;
-                    el.style.zIndex = '';
-                    document.body.style.cursor = '';
-                    window.removeEventListener('mousemove', moveHandler);
-                    window.removeEventListener('mouseup', upHandler);
-                };
-                
-                window.addEventListener('mousemove', moveHandler);
-                window.addEventListener('mouseup', upHandler);
-            };
-        }
-        
-        // --- SEQUENCER UPDATE ---
-        function updateSequencerPositionsOnly() {
-             updateSequencer();
-        }
-
-        function updateSequencer() {
-            const vOff = parseFloat($('voiceOffset').value);
-            const oOff = parseFloat($('outroOffset').value);
-            const buildUp = $('buildUpOn').checked ? (4 * 0.150) : 0;
-            
-            let voiceD = 0;
-            if (selectedVoiceIndex !== -1 && voiceLibrary[selectedVoiceIndex]) {
-                 const vBuf = voiceLibrary[selectedVoiceIndex].buffer;
-                 const pitchSemis = parseInt($('voicePitch').value);
-                 const pitchRate = Math.pow(2, pitchSemis / 12);
-                 const cue = findAudioStart(vBuf);
-                 voiceD = (vBuf.duration - cue) / pitchRate;
-            }
-
-            const tIntro = 0;
-            const tVoice = Math.max(0, tIntro + vOff);
-            const tOutro = Math.max(0, tVoice + buildUp + voiceD + oOff);
-
-            const introEl = document.getElementById('seqWaveIntro');
-            const voiceEl = document.getElementById('seqWaveVoice');
-            const outroEl = document.getElementById('seqWaveOutro');
-            const bedEl = document.getElementById('seqWaveBed'); // BED
-
-            if (introEl) introEl.style.left = (tIntro * SEQ_PX_PER_SEC) + 'px';
-            if (voiceEl) voiceEl.style.left = (tVoice * SEQ_PX_PER_SEC) + 'px';
-            if (outroEl) outroEl.style.left = (tOutro * SEQ_PX_PER_SEC) + 'px';
-            if (bedEl) bedEl.style.left = '0px'; 
-            
-            // VOICE BLOCK SETUP
-            if (voiceEl && voiceLibrary[selectedVoiceIndex]) {
-                 if (voiceEl.children.length === 0) {
-                     voiceEl.style.width = ((voiceD + buildUp) * SEQ_PX_PER_SEC) + 'px';
-                     voiceEl.style.backgroundColor = 'var(--voice)';
-                     voiceEl.textContent = "VOICE";
-                     voiceEl.style.display = 'flex'; voiceEl.style.alignItems='center'; voiceEl.style.padding='0 8px';
-                 } else {
-                     voiceEl.style.width = ((voiceD + buildUp) * SEQ_PX_PER_SEC) + 'px';
-                 }
-            } else if (voiceEl) {
-                voiceEl.style.width = '100px'; 
-            }
-        }
-        
-        // Voice Drag
-        initDraggable('seqWaveVoice', (time) => {
-             const vOff = time;
-             $('voiceOffset').value = vOff.toFixed(2);
-             $('voiceOffsetVal').textContent = vOff.toFixed(2) + 's';
-             updateSequencerPositionsOnly();
-             renderedBuffer = null;
-        });
-
-        // --- TRANSPORT LOGIC ---
-        $('seqPlayBtn').onclick = async () => {
-             if (isPlayingSequence) return;
-             await generateAndPlay();
-        };
-
-        $('seqStopBtn').onclick = () => {
-             stopSequence();
-        };
-
-        function stopSequence() {
-             if (playbackSource) {
-                 try { playbackSource.stop(); } catch(e){}
-                 playbackSource = null;
-             }
-             isPlayingSequence = false;
-             $('seqPlayBtn').classList.remove('active');
-             $('seqPlayhead').style.display = 'none';
-             if (playheadReqId) cancelAnimationFrame(playheadReqId);
-        }
-
-        async function generateAndPlay() {
-             stopSequence();
-             $('seqPlayBtn').classList.add('active');
-             
-             $('statusText').textContent = "Rendering...";
-             const buffer = await renderAudio(false);
-             if (!buffer) {
-                 stopSequence();
-                 $('statusText').textContent = "Render Failed";
-                 return;
-             }
-             renderedBuffer = buffer; 
-             $('statusText').textContent = "Playing...";
-             
-             const src = ctx.createBufferSource();
-             src.buffer = renderedBuffer;
-             src.connect(ctx.destination);
-             src.start();
-             playbackSource = src;
-             
-             isPlayingSequence = true;
-             sequenceStartTime = ctx.currentTime;
-             $('seqPlayhead').style.display = 'block';
-             
-             updatePlayhead();
-             
-             src.onended = () => {
-                 stopSequence();
-                 $('statusText').textContent = "Done";
-             };
-        }
-
-        function updatePlayhead() {
-            if (!isPlayingSequence) return;
-            const elapsed = ctx.currentTime - sequenceStartTime;
-            const px = elapsed * SEQ_PX_PER_SEC;
-            $('seqPlayhead').style.left = px + 'px';
-            playheadReqId = requestAnimationFrame(updatePlayhead);
-        }
-
-        // --- RENDER FUNCTION (Unified) ---
-        async function renderAudio(forDownload) {
-             if (ctx.state === 'suspended') await ctx.resume();
-             
-             const t0 = 0;
-             const introDur = (introBuffer && introTrim.end > introTrim.start) ? (introTrim.end - introTrim.start) : 0;
-             const outroDur = (outroBuffer && outroTrim.end > outroTrim.start) ? (outroTrim.end - outroTrim.start) : 0;
-             
-             let voiceD = 0;
-             let voiceObj = null;
-             let cuePoint = 0;
-             let pitchSemis = 0;
-             
-             if (selectedVoiceIndex !== -1 && voiceLibrary[selectedVoiceIndex]) {
-                 voiceObj = voiceLibrary[selectedVoiceIndex];
-                 cuePoint = findAudioStart(voiceObj.buffer);
-                 pitchSemis = parseInt($('voicePitch').value);
-                 const pitchRate = Math.pow(2, pitchSemis / 12);
-                 voiceD = (voiceObj.buffer.duration - cuePoint) / pitchRate;
-             }
-             
-             const introOffset = parseFloat($('voiceOffset').value);
-             const outroOffset = parseFloat($('outroOffset').value);
-             const endTrim = parseFloat($('endTrim').value);
-             const buildUpOn = $('buildUpOn').checked;
-             const widthOn = $('widthOn').checked;
-             const tailOn = $('tailOn').checked;
-             
-             const stutterCount = 4; const stutterLen = 0.150;
-             const buildUpDur = buildUpOn ? (stutterCount * stutterLen) : 0;
-             
-             const timeIntro = t0;
-             let timeVoice = t0 + introOffset;
-             if (timeVoice < t0) timeVoice = t0;
-             const absVoiceStart = timeVoice + buildUpDur;
-             
-             const rawVoiceDur = voiceD;
-             let timeOutro = timeVoice + buildUpDur + rawVoiceDur + outroOffset;
-             let realOutroStart = timeOutro; if (realOutroStart < t0) realOutroStart = t0;
-             
-             const endIntro = timeIntro + introDur;
-             const endVoice = absVoiceStart + rawVoiceDur + (tailOn ? 2.0 : 0.5);
-             const endOutro = realOutroStart + outroDur;
-             
-             let naturalEnd = Math.max(endIntro, endVoice, endOutro);
-             let fadeStart = naturalEnd + endTrim;
-             if (fadeStart < t0 + 1) fadeStart = t0 + 1;
-             const totalDuration = fadeStart + 2.0;
-
-             const offlineCtx = new OfflineAudioContext(2, totalDuration * ctx.sampleRate, ctx.sampleRate);
-             
-             const masterComp = offlineCtx.createDynamicsCompressor();
-             masterComp.threshold.value = -12; masterComp.knee.value = 30; masterComp.ratio.value = 4; masterComp.attack.value = 0.003; masterComp.release.value = 0.25;
-             const masterGain = offlineCtx.createGain(); masterGain.gain.value = 1.0;
-             masterComp.connect(masterGain); masterGain.connect(offlineCtx.destination);
-             
-             if (introBuffer && introDur > 0) {
-                 const src = offlineCtx.createBufferSource(); src.buffer = introBuffer;
-                 const g = offlineCtx.createGain(); g.gain.value = $('introVol').value;
-                 src.connect(g).connect(masterComp);
-                 src.start(timeIntro, introTrim.start, introDur);
-             }
-             
-             if (musicBuffer) {
-                 const src = offlineCtx.createBufferSource(); src.buffer = musicBuffer;
-                 const g = offlineCtx.createGain(); g.gain.setValueAtTime(parseFloat($('bedVol').value), t0);
-                 src.connect(g).connect(masterComp);
-                 src.start(t0);
-                 
-                 if ($('autoDuck').checked) {
-                     const start = timeVoice; const end = timeOutro; const v = parseFloat($('bedVol').value);
-                     g.gain.setValueAtTime(v, start); 
-                     g.gain.linearRampToValueAtTime(v * 0.3, start + 0.3);
-                     g.gain.setValueAtTime(v * 0.3, end); 
-                     g.gain.linearRampToValueAtTime(v, end + 1.0);
-                 }
-             }
-             
-             if (voiceObj) {
-                 const voiceVol = parseFloat($('voiceVol').value);
-
-                 if (buildUpOn) {
-                    const bg = offlineCtx.createGain(); bg.gain.value = voiceVol;
-                    const dly = offlineCtx.createDelay(); dly.delayTime.value = 0.005;
-                    const lfo = offlineCtx.createOscillator(); lfo.frequency.value = 3;
-                    const dep = offlineCtx.createGain(); dep.gain.value = 0.002;
-                    lfo.connect(dep).connect(dly.delayTime); lfo.start(t0);
-                    const hpf = offlineCtx.createBiquadFilter(); hpf.type = 'highpass';
-                    hpf.frequency.setValueAtTime(200, timeVoice); hpf.frequency.exponentialRampToValueAtTime(1000, timeVoice + buildUpDur);
-                    hpf.connect(dly).connect(bg).connect(masterComp);
-
-                    const startP = -300; const endP = 0;
-                    for (let i = 0; i < stutterCount; i++) {
-                        const s = offlineCtx.createBufferSource(); s.buffer = voiceObj.buffer;
-                        const p = i / (stutterCount - 1);
-                        s.detune.value = (startP + (p * (endP - startP))) + (pitchSemis * 100);
-                        s.connect(hpf); s.start(timeVoice + (i * stutterLen), cuePoint, stutterLen);
-                    }
-                 }
-                 
-                 const main = offlineCtx.createBufferSource(); main.buffer = voiceObj.buffer;
-                 main.detune.value = pitchSemis * 100;
-                 let head = main;
-                 
-                 if (widthOn) {
-                    const pEQ = offlineCtx.createBiquadFilter(); pEQ.type = 'peaking'; pEQ.frequency.value = 3000; pEQ.gain.value = 4;
-                    const aEQ = offlineCtx.createBiquadFilter(); aEQ.type = 'highshelf'; aEQ.frequency.value = 10000; aEQ.gain.value = 5;
-                    main.connect(pEQ).connect(aEQ); head = aEQ;
-
-                    const wAmt = parseFloat($('widthAmt').value);
-                    if (wAmt > 0) {
-                        const wg = offlineCtx.createGain(); wg.gain.value = wAmt * 0.85;
-                        const sL = offlineCtx.createBufferSource(); sL.buffer = voiceObj.buffer; sL.detune.value = (pitchSemis * 100) - 25;
-                        const sR = offlineCtx.createBufferSource(); sR.buffer = voiceObj.buffer; sR.detune.value = (pitchSemis * 100) + 25;
-                        const dL = offlineCtx.createDelay(); dL.delayTime.value = 0.018; const pL = offlineCtx.createStereoPanner(); pL.pan.value = -1;
-                        const dR = offlineCtx.createDelay(); dR.delayTime.value = 0.028; const pR = offlineCtx.createStereoPanner(); pR.pan.value = 1;
-                        sL.connect(dL).connect(pL).connect(wg); sR.connect(dR).connect(pR).connect(wg); wg.connect(masterComp);
-                        sL.start(absVoiceStart, cuePoint); sR.start(absVoiceStart, cuePoint);
-                    }
-                 }
-                 
-                 const vg = offlineCtx.createGain(); vg.gain.value = voiceVol;
-                 head.connect(vg).connect(masterComp);
-                 
-                 if (tailOn) {
-                    const startPct = parseFloat($('tailStart').value);
-                    const mix = parseFloat($('tailMix').value);
-                    const ts = offlineCtx.createGain(); ts.gain.value = 0;
-                    const dL = offlineCtx.createDelay(); dL.delayTime.value = 0.3; const dR = offlineCtx.createDelay(); dR.delayTime.value = 0.45;
-                    const fbL = offlineCtx.createGain(); fbL.gain.value = 0.4; const fbR = offlineCtx.createGain(); fbR.gain.value = 0.4;
-                    
-                    head.connect(ts);
-                    ts.connect(dL).connect(fbL).connect(dL); dL.connect(masterComp);
-                    ts.connect(dR).connect(fbR).connect(dR); dR.connect(masterComp);
-                    
-                    ts.gain.setValueAtTime(0, absVoiceStart);
-                    ts.gain.linearRampToValueAtTime(mix * 0.4, absVoiceStart + (rawVoiceDur * 0.5));
-                 }
-                 
-                 main.start(absVoiceStart, cuePoint);
-             }
-             
-             if (outroBuffer && outroDur > 0) {
-                 const src = offlineCtx.createBufferSource(); src.buffer = outroBuffer;
-                 const g = offlineCtx.createGain(); g.gain.value = $('outroVol').value;
-                 src.connect(g).connect(masterComp);
-                 src.start(realOutroStart, outroTrim.start, outroDur);
-             }
-             
-             masterGain.gain.setValueAtTime(1.0, fadeStart);
-             masterGain.gain.linearRampToValueAtTime(0, fadeStart + 2.0);
-             
-             return await offlineCtx.startRendering();
-        }
-
-        // --- EVENT HANDLERS ---
+        // -- EVENT LISTENERS --
         $('voiceUploader').addEventListener('change', async (e) => {
             const files = Array.from(e.target.files);
             if (!files.length) return;
@@ -2374,8 +1924,8 @@
             saveTrackToDB("intro", f);
             introBuffer = await loadAudioFile(f);
             $('introStatus').innerText = "Loaded: " + f.name;
-            initWaveform('ignored', f, 'intro'); 
-            updateSequencerPositionsOnly();
+            initWaveform('introWave', f, 'intro');
+            updateSequencer();
         });
 
         $('outroFile').addEventListener('change', async (e) => {
@@ -2384,8 +1934,8 @@
             saveTrackToDB("outro", f);
             outroBuffer = await loadAudioFile(f);
             $('outroStatus').innerText = "Loaded: " + f.name;
-            initWaveform('ignored', f, 'outro');
-            updateSequencerPositionsOnly();
+            initWaveform('outroWave', f, 'outro');
+            updateSequencer();
         });
 
         $('bedFile').addEventListener('change', async (e) => {
@@ -2393,40 +1943,407 @@
             saveTrackToDB("bed", f);
             musicBuffer = await loadAudioFile(f);
             $('bedStatus').innerText = "Loaded: " + f.name;
-            initWaveform('ignored', f, 'bed'); 
-            updateSequencerPositionsOnly();
+            updateSequencer();
         });
 
-        $('uploadIntroBtn').onclick = () => { if (currentIntroFile) uploadToCloud(currentIntroFile, 'intro'); else alert("No file"); };
-        $('uploadOutroBtn').onclick = () => { if (currentOutroFile) uploadToCloud(currentOutroFile, 'outro'); else alert("No file"); };
+        // CLOUD UPLOAD HANDLERS
+        $('uploadIntroBtn').onclick = () => {
+            if (currentIntroFile) uploadToCloud(currentIntroFile, 'intro');
+            else alert("No Intro file loaded locally.");
+        };
+        $('uploadOutroBtn').onclick = () => {
+            if (currentOutroFile) uploadToCloud(currentOutroFile, 'outro');
+            else alert("No Outro file loaded locally.");
+        };
 
+        // -- SEQUENCER --
+        // -- SEQUENCER --
         $('generateBtn').addEventListener('click', async () => {
-             const btn = $('generateBtn');
-             btn.disabled = true;
-             $('statusText').textContent = "Rendering...";
-             
-             const buffer = await renderAudio(true);
-             if (!buffer) { btn.disabled = false; return; }
-             renderedBuffer = buffer;
-             
-             const wav = audioBufferToWav(buffer);
-             const blob = new Blob([wav], { type: 'audio/wav' });
-             const url = URL.createObjectURL(blob);
-             const a = document.createElement('a');
-             a.href = url;
-             a.download = `DJDROP_${Date.now()}.wav`;
-             a.click();
-             
-             $('statusText').textContent = "Saved";
-             btn.disabled = false;
+            if (ctx.state === 'suspended') await ctx.resume();
+            if (selectedVoiceIndex === -1) { alert("Select a voice!"); return; }
+
+            // Stop previous playback if any
+            if (playbackSource) {
+                try { playbackSource.stop(); } catch (e) { }
+                playbackSource = null;
+            }
+
+            const btn = $('generateBtn');
+            const status = $('statusText');
+            const progress = $('progressBar');
+
+            btn.disabled = true;
+            status.textContent = "Rendering...";
+            progress.style.width = "0%";
+            $('downloadBtn').disabled = true;
+
+            // 1. CALCULATE DURATION
+            const t0 = 0; // Relative start time for offline render
+
+            // Use Trimmed Duration for Intro
+            const introDur = (introBuffer && introTrim.end > introTrim.start) ? (introTrim.end - introTrim.start) : 0;
+
+            const voiceObj = voiceLibrary[selectedVoiceIndex];
+            const cuePoint = findAudioStart(voiceObj.buffer);
+
+            const pitchSemis = parseInt($('voicePitch').value);
+            const pitchRate = Math.pow(2, pitchSemis / 12);
+
+            const introOffset = parseFloat($('voiceOffset').value);
+            const outroOffset = parseFloat($('outroOffset').value);
+            const endTrim = parseFloat($('endTrim').value);
+
+            const buildUpOn = $('buildUpOn').checked;
+            const widthOn = $('widthOn').checked;
+            const tailOn = $('tailOn').checked;
+
+            const stutterCount = 4; const stutterLen = 0.150;
+            const buildUpDur = buildUpOn ? (stutterCount * stutterLen) : 0;
+            const rawVoiceDur = (voiceObj.buffer.duration - cuePoint) / pitchRate;
+            // Note: The voice duration might be slightly longer due to effects (tail/delay), but we estimate the main section
+
+            // TIMELINE CALCULATIONS
+            const timeIntro = t0;
+            let timeVoice = t0 + introOffset;
+            if (timeVoice < t0) timeVoice = t0;
+            const absVoiceStart = timeVoice + buildUpDur;
+            const timeOutro = timeVoice + buildUpDur + rawVoiceDur + outroOffset;
+
+            let realOutroStart = timeOutro;
+            if (realOutroStart < t0) realOutroStart = t0;
+
+            // Use Trimmed Duration for Outro
+            const outroDur = (outroBuffer && outroTrim.end > outroTrim.start) ? (outroTrim.end - outroTrim.start) : 0;
+
+            // Determine total length
+            const endIntro = timeIntro + introDur;
+            const endVoice = absVoiceStart + rawVoiceDur + (tailOn ? 2.0 : 0.5); // Add buffer for tail
+            const endOutro = realOutroStart + outroDur;
+
+            let naturalEnd = Math.max(endIntro, endVoice, endOutro);
+            let fadeStart = naturalEnd + endTrim;
+
+            // Ensure minimum length
+            if (fadeStart < t0 + 1) fadeStart = t0 + 1;
+
+            const totalDuration = fadeStart + 2.0; // +2s for fade out
+
+            // 2. OFFLINE RENDER
+            const offlineCtx = new OfflineAudioContext(2, totalDuration * ctx.sampleRate, ctx.sampleRate);
+
+            // Re-create graph on offlineCtx
+            const masterComp = offlineCtx.createDynamicsCompressor();
+            masterComp.threshold.value = -12; masterComp.knee.value = 30; masterComp.ratio.value = 4; masterComp.attack.value = 0.003; masterComp.release.value = 0.25;
+            const masterGain = offlineCtx.createGain(); masterGain.gain.value = 1.0;
+            masterComp.connect(masterGain); masterGain.connect(offlineCtx.destination);
+
+            // -- INTRO --
+            if (introBuffer && introDur > 0) {
+                const src = offlineCtx.createBufferSource(); src.buffer = introBuffer;
+                const g = offlineCtx.createGain(); g.gain.value = $('introVol').value;
+                src.connect(g).connect(masterComp);
+                src.start(timeIntro, introTrim.start, introDur);
+            }
+
+            // -- MUSIC BED --
+            let bedGain;
+            if (musicBuffer) {
+                const bedNode = offlineCtx.createBufferSource(); bedNode.buffer = musicBuffer;
+                bedGain = offlineCtx.createGain(); bedGain.gain.setValueAtTime(parseFloat($('bedVol').value), t0);
+                bedNode.connect(bedGain).connect(masterComp); bedNode.start(t0);
+            }
+
+            // -- VOICE --
+            const voiceVol = parseFloat($('voiceVol').value);
+
+            // Build Up
+            if (buildUpOn) {
+                const bg = offlineCtx.createGain(); bg.gain.value = voiceVol;
+                const dly = offlineCtx.createDelay(); dly.delayTime.value = 0.005;
+                const lfo = offlineCtx.createOscillator(); lfo.frequency.value = 3;
+                const dep = offlineCtx.createGain(); dep.gain.value = 0.002;
+                lfo.connect(dep).connect(dly.delayTime); lfo.start(t0);
+                const hpf = offlineCtx.createBiquadFilter(); hpf.type = 'highpass';
+                hpf.frequency.setValueAtTime(200, timeVoice); hpf.frequency.exponentialRampToValueAtTime(1000, timeVoice + buildUpDur);
+                hpf.connect(dly).connect(bg).connect(masterComp);
+
+                const startP = -300; const endP = 0;
+                for (let i = 0; i < stutterCount; i++) {
+                    const s = offlineCtx.createBufferSource(); s.buffer = voiceObj.buffer;
+                    const p = i / (stutterCount - 1);
+                    s.detune.value = (startP + (p * (endP - startP))) + (pitchSemis * 100);
+                    s.connect(hpf); s.start(timeVoice + (i * stutterLen), cuePoint, stutterLen);
+                }
+            }
+
+            // Main Voice
+            const main = offlineCtx.createBufferSource(); main.buffer = voiceObj.buffer;
+            main.detune.value = pitchSemis * 100;
+            let head = main;
+
+            if (widthOn) {
+                const pEQ = offlineCtx.createBiquadFilter(); pEQ.type = 'peaking'; pEQ.frequency.value = 3000; pEQ.gain.value = 4;
+                const aEQ = offlineCtx.createBiquadFilter(); aEQ.type = 'highshelf'; aEQ.frequency.value = 10000; aEQ.gain.value = 5;
+                main.connect(pEQ).connect(aEQ); head = aEQ;
+
+                // Width FX
+                const wAmt = parseFloat($('widthAmt').value);
+                if (wAmt > 0) {
+                    const wg = offlineCtx.createGain(); wg.gain.value = wAmt * 0.85;
+                    const sL = offlineCtx.createBufferSource(); sL.buffer = voiceObj.buffer; sL.detune.value = (pitchSemis * 100) - 25;
+                    const sR = offlineCtx.createBufferSource(); sR.buffer = voiceObj.buffer; sR.detune.value = (pitchSemis * 100) + 25;
+                    const dL = offlineCtx.createDelay(); dL.delayTime.value = 0.018; const pL = offlineCtx.createStereoPanner(); pL.pan.value = -1;
+                    const dR = offlineCtx.createDelay(); dR.delayTime.value = 0.028; const pR = offlineCtx.createStereoPanner(); pR.pan.value = 1;
+                    sL.connect(dL).connect(pL).connect(wg); sR.connect(dR).connect(pR).connect(wg); wg.connect(masterComp);
+                    sL.start(absVoiceStart, cuePoint); sR.start(absVoiceStart, cuePoint);
+                }
+            }
+
+            const vg = offlineCtx.createGain(); vg.gain.value = voiceVol;
+            head.connect(vg).connect(masterComp);
+
+            // Tail FX
+            if (tailOn) {
+                const startPct = parseFloat($('tailStart').value);
+                const mix = parseFloat($('tailMix').value);
+                const ts = offlineCtx.createGain(); ts.gain.value = 0;
+                const dL = offlineCtx.createDelay(); dL.delayTime.value = 0.3; const dR = offlineCtx.createDelay(); dR.delayTime.value = 0.45;
+                const fbL = offlineCtx.createGain(); fbL.gain.value = 0.4; const fbR = offlineCtx.createGain(); fbR.gain.value = 0.4;
+                const m = offlineCtx.createChannelMerger(2);
+                ts.connect(dL); ts.connect(dR); dL.connect(fbL).connect(dR); dR.connect(fbR).connect(dL);
+                dL.connect(m, 0, 0); dR.connect(m, 0, 1);
+                const rev = offlineCtx.createConvolver(); rev.buffer = reverbBuffer;
+                m.connect(masterComp); ts.connect(rev).connect(masterComp); vg.connect(ts);
+                const tStart = absVoiceStart + (rawVoiceDur * startPct);
+                ts.gain.setValueAtTime(0, tStart); ts.gain.linearRampToValueAtTime(mix, absVoiceStart + rawVoiceDur);
+            }
+            main.start(absVoiceStart, cuePoint);
+
+            // -- OUTRO --
+            if (outroBuffer && outroDur > 0) {
+                const src = offlineCtx.createBufferSource(); src.buffer = outroBuffer;
+                const g = offlineCtx.createGain(); g.gain.value = $('outroVol').value;
+                src.connect(g).connect(masterComp);
+                src.start(realOutroStart, outroTrim.start, outroDur);
+            }
+
+            // -- DUCKING --
+            if (musicBuffer && $('autoDuck').checked) {
+                const start = timeVoice; const end = timeOutro; const v = parseFloat($('bedVol').value);
+                bedGain.gain.setValueAtTime(v, start); bedGain.gain.linearRampToValueAtTime(v * 0.3, start + 0.3);
+                bedGain.gain.setValueAtTime(v * 0.3, end); bedGain.gain.linearRampToValueAtTime(v, end + 1.0);
+            }
+
+            // -- MASTER FADE OUT --
+            masterGain.gain.setValueAtTime(1, fadeStart);
+            masterGain.gain.linearRampToValueAtTime(0, totalDuration);
+
+            // 3. START RENDER
+            try {
+                renderedBuffer = await offlineCtx.startRendering();
+
+                // 4. PLAYBACK PREVIEW on Main Context
+                if (ctx.state === 'suspended') await ctx.resume();
+
+                playbackSource = ctx.createBufferSource();
+                playbackSource.buffer = renderedBuffer;
+                playbackSource.connect(ctx.destination);
+                playbackSource.start();
+
+                status.textContent = "Playing...";
+                progress.style.width = "100%";
+
+                playbackSource.onended = () => {
+                    status.textContent = "Done!";
+                    btn.disabled = false;
+                    progress.style.width = "0%";
+                    playbackSource = null;
+                };
+
+                // Enable download
+                $('downloadBtn').disabled = false;
+
+            } catch (e) {
+                console.error("Rendering failed", e);
+                status.textContent = "Error!";
+                btn.disabled = false;
+            }
         });
-        
-        ['voiceOffset', 'outroOffset', 'voicePitch', 'buildUpOn'].forEach(id => {
-            document.getElementById(id).addEventListener('input', () => {
-                updateSequencerPositionsOnly();
-                renderedBuffer = null;
+
+        $('downloadBtn').onclick = async () => {
+            if (!renderedBuffer) return;
+            const status = $('statusText');
+
+            status.textContent = "Saving...";
+            const wavBlob = audioBufferToWav(renderedBuffer);
+
+            // Try to use modern File System Access API for Save As dialog
+            if ('showSaveFilePicker' in window) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: `dj-drop-${Date.now()}.wav`,
+                        types: [{
+                            description: 'WAV Audio',
+                            accept: { 'audio/wav': ['.wav'] }
+                        }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(wavBlob);
+                    await writable.close();
+                    status.textContent = "Saved";
+                    return;
+                } catch (err) {
+                    if (err.name === 'AbortError') { status.textContent = "Done!"; return; }
+                    console.warn('Save dialog failed, using fallback:', err);
+                }
+            }
+
+            // Fallback
+            const url = URL.createObjectURL(wavBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dj-drop-${Date.now()}.wav`;
+            a.click();
+            status.textContent = "Saved";
+        };
+
+        // --- VISUAL SEQUENCER LOGIC ---
+        const SEQ_PX_PER_SEC = 20; // Scale: 20px = 1 second
+
+        function updateSequencer() {
+            // durations
+            const introD = (introBuffer && introTrim.end > introTrim.start) ? (introTrim.end - introTrim.start) : 0;
+            const outroD = (outroBuffer && outroTrim.end > outroTrim.start) ? (outroTrim.end - outroTrim.start) : 0;
+
+            // Voice duration (approx)
+            let voiceD = 0;
+            if (voiceLibrary[selectedVoiceIndex]) {
+                const vBuf = voiceLibrary[selectedVoiceIndex].buffer;
+                const pitchSemis = parseInt($('voicePitch').value);
+                const pitchRate = Math.pow(2, pitchSemis / 12);
+                const cue = findAudioStart(vBuf);
+                voiceD = (vBuf.duration - cue) / pitchRate;
+            }
+
+            // Offsets
+            const introOff = parseFloat($('voiceOffset').value) * -1; // "Voice offset" is relative, so let's treat intro as movable? 
+            // WAIT - The current logic is: Voice Offset is how long AFTER intro starts that voice starts.
+            // But we want to visualize strictly on a timeline.
+            // Let's pin BED at 0.
+            // INTRO starts at 0.
+            // VOICE starts at introOffset (voiceOffset input).
+            // OUTRO starts at (voiceStart + voiceDur + outroOffset).
+
+            // Actually, to fully "Sequence", we should allow dragging Intro too? 
+            // For now, let's keep the existing logic:
+            // T0 = 0. 
+            // Intro Start = 0.
+            // Voice Start = Intro Start + Input('voiceOffset').
+            // Outro Start = Voice End + Input('outroOffset').
+
+            const vOff = parseFloat($('voiceOffset').value);
+            const oOff = parseFloat($('outroOffset').value);
+            const buildUp = $('buildUpOn').checked ? (4 * 0.150) : 0;
+
+            const tIntro = 0;
+            const tVoice = Math.max(0, tIntro + vOff);
+            const tOutro = Math.max(0, tVoice + buildUp + voiceD + oOff);
+
+            // Update Widths
+            $('clipIntro').style.width = (introD * SEQ_PX_PER_SEC) + 'px';
+            $('clipVoice').style.width = ((voiceD + buildUp) * SEQ_PX_PER_SEC) + 'px';
+            $('clipOutro').style.width = (outroD * SEQ_PX_PER_SEC) + 'px';
+
+            // Update Positions
+            $('clipIntro').style.left = (tIntro * SEQ_PX_PER_SEC) + 'px';
+            $('clipVoice').style.left = (tVoice * SEQ_PX_PER_SEC) + 'px';
+            $('clipOutro').style.left = (tOutro * SEQ_PX_PER_SEC) + 'px';
+
+            // Update Bed (Visual only)
+            if (musicBuffer) $('clipBed').style.width = (musicBuffer.duration * SEQ_PX_PER_SEC) + 'px';
+        }
+
+        // Init Dragging
+        function initDraggable(elId, onDrag) {
+            const el = document.getElementById(elId);
+            let isDragging = false;
+            let startX, startLeft;
+
+            el.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.clientX;
+                startLeft = el.offsetLeft;
+                el.style.zIndex = 100;
+                document.body.style.cursor = 'grabbing';
             });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                let newLeft = startLeft + dx;
+                if (newLeft < 0) newLeft = 0;
+
+                el.style.left = newLeft + 'px';
+
+                // Convert px back to seconds
+                const newTime = newLeft / SEQ_PX_PER_SEC;
+                onDrag(newTime);
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    el.style.zIndex = '';
+                    document.body.style.cursor = '';
+                }
+            });
+        }
+
+        // Setup Drags
+        // 1. Dragging Intro? Currently fixed at 0 in logic. Let's just allow dragging VOICE.
+        // If we drag voice, we update 'voiceOffset'
+        initDraggable('clipVoice', (time) => {
+            // Voice Offset = VoiceStart - IntroStart(0)
+            const vOff = time;
+            $('voiceOffset').value = vOff.toFixed(2);
+            $('voiceOffsetVal').textContent = vOff.toFixed(2) + 's';
+            updateSequencer(); // re-calc outro pos which depends on voice
         });
+
+        // 2. Dragging Outro
+        initDraggable('clipOutro', (time) => {
+            // Outro Offset is relative to Voice End
+            // Time = VoiceStart + VoiceDur + OutroOffset
+            // So OutroOffset = Time - (VoiceStart + VoiceDur)
+
+            const vOff = parseFloat($('voiceOffset').value);
+            // Re-calc voice duration
+            let voiceD = 0;
+            if (voiceLibrary[selectedVoiceIndex]) {
+                const vBuf = voiceLibrary[selectedVoiceIndex].buffer;
+                const pitchSemis = parseInt($('voicePitch').value);
+                const pitchRate = Math.pow(2, pitchSemis / 12);
+                const cue = findAudioStart(vBuf);
+                voiceD = (vBuf.duration - cue) / pitchRate;
+            }
+            const buildUp = $('buildUpOn').checked ? (4 * 0.150) : 0;
+            const voiceEnd = vOff + buildUp + voiceD;
+
+            const newOffset = time - voiceEnd;
+            $('outroOffset').value = newOffset.toFixed(2);
+            $('outroOffsetVal').textContent = newOffset.toFixed(2) + 's';
+        });
+
+        // Hook into existing updates
+        ['voiceOffset', 'outroOffset', 'voicePitch', 'buildUpOn'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updateSequencer);
+            document.getElementById(id).addEventListener('change', updateSequencer);
+        });
+
+        // Hook into Intro/Outro load/trim
+        // We need to call updateSequencer whenever wavesurfer region updates or file loads
+        // I will add calls to updateSequencer() in the relevant places below
+
     </script>
 </body>
 
