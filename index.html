@@ -835,7 +835,7 @@
 
         async function uploadToCloud(file, type) {
             if (!cloudEnabled) return alert("Cloud not configured.");
-            if (file.size > 2000000) return alert("File too large for Cloud Library (Max 2MB). Use local only.");
+            if (file.size > 750000) return alert("File too large for Cloud Library (Max 750KB). Use local only or compress the file.");
 
             const reader = new FileReader();
             reader.onload = async (e) => {
