@@ -898,7 +898,12 @@
 
             <!-- CLOUD CONTENT -->
             <div id="contentCloud" class="tab-content">
-                <div class="crate-header">Community Library</div>
+                <div class="crate-header" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Community Library</span>
+                    <button id="batchUploadBtn" class="cloud-btn" style="display:flex; margin:0;"
+                        title="Batch Upload Sounds">☁️ Upload</button>
+                    <input type="file" id="batchUploadInput" multiple style="display:none" accept="audio/*">
+                </div>
                 <p style="font-size:0.7rem; color:#666; padding:0 10px;">
                     Shared SFX from other users. Click to load into Intro/Outro slots.
                 </p>
@@ -1827,11 +1832,39 @@
         // CLOUD UPLOAD HANDLERS
         $('uploadIntroBtn').onclick = () => {
             if (currentIntroFile) uploadToCloud(currentIntroFile, 'intro');
-            else alert("No Intro file loaded locally.");
+            else alert("Load an Intro file first.");
         };
         $('uploadOutroBtn').onclick = () => {
             if (currentOutroFile) uploadToCloud(currentOutroFile, 'outro');
-            else alert("No Outro file loaded locally.");
+            else alert("Load an Outro file first.");
+        };
+
+        // BATCH UPLOAD
+        $('batchUploadBtn').onclick = () => $('batchUploadInput').click();
+
+        $('batchUploadInput').onchange = async (e) => {
+            const files = Array.from(e.target.files);
+            if (!files.length) return;
+
+            // Ask for category once
+            const cat = prompt(`Uploading ${files.length} files.\nEnter category (intro, outro, sfx, voice, bed):`, "sfx");
+            if (!cat) return; // cancelled
+
+            const validCats = ['intro', 'outro', 'sfx', 'voice', 'bed'];
+            const finalCat = validCats.includes(cat.toLowerCase()) ? cat.toLowerCase() : 'sfx';
+
+            if (!confirm(`Upload ${files.length} files to '${finalCat}'?`)) return;
+
+            let successCount = 0;
+            for (const file of files) {
+                try {
+                    await uploadToCloud(file, finalCat);
+                    successCount++;
+                } catch (err) {
+                    console.error("Batch upload error:", err);
+                }
+            }
+            alert(`Batch Complete: ${successCount}/${files.length} uploaded.`);
         };
 
         // -- SEQUENCER --
