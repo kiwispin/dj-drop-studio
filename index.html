@@ -166,7 +166,7 @@
             gap: 4px;
         }
 
-        .cloud-btn {
+        .lib-btn {
             background: #333;
             border: none;
             color: #aaa;
@@ -176,7 +176,7 @@
             font-size: 0.75rem;
         }
 
-        .cloud-btn:hover {
+        .lib-btn:hover {
             background: var(--accent);
             color: #fff;
         }
@@ -865,12 +865,12 @@
                     const isLegacy = !data.storagePath;
 
                     li.innerHTML = `
-                    <button class="cloud-btn preview-btn" title="Preview" ${isLegacy ? 'disabled style="opacity:0.3"' : ''}>▶</button>
+                    <button class="lib-btn preview-btn" title="Preview" ${isLegacy ? 'disabled style="opacity:0.3"' : ''}>▶</button>
                     <span class="cloud-name" ${isLegacy ? 'style="color:#666; text-decoration:line-through;"' : ''}>${data.name}${isLegacy ? ' (old format)' : ''}</span>
                     <div class="cloud-actions">
-                        <button class="cloud-btn load-btn" data-slot="intro" title="Load as Intro" ${isLegacy ? 'disabled style="opacity:0.3"' : ''}>→I</button>
-                        <button class="cloud-btn load-btn" data-slot="outro" title="Load as Outro" ${isLegacy ? 'disabled style="opacity:0.3"' : ''}>→O</button>
-                        <button class="cloud-btn delete-btn" title="Delete">🗑</button>
+                        <button class="lib-btn load-btn" data-slot="intro" title="Load as Intro" ${isLegacy ? 'disabled style="opacity:0.3"' : ''}>→I</button>
+                        <button class="lib-btn load-btn" data-slot="outro" title="Load as Outro" ${isLegacy ? 'disabled style="opacity:0.3"' : ''}>→O</button>
+                        <button class="lib-btn delete-btn" title="Delete">🗑</button>
                     </div>
                 `;
                     // Preview button (only if has storagePath)
