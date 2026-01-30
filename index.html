@@ -928,12 +928,7 @@
                             <span class="track-number">1</span>
                             Intro SFX
                         </div>
-                        <button class="cloud-btn" id="uploadIntroBtn" title="Upload current Intro to Cloud Library">
-                            <svg viewBox="0 0 24 24">
-                                <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5z" />
-                            </svg>
-                            Share
-                        </button>
+
                     </div>
                     <div class="file-input-wrapper">
                         <label class="file-btn">
@@ -959,12 +954,7 @@
                             <span class="track-number">3</span>
                             Outro SFX
                         </div>
-                        <button class="cloud-btn" id="uploadOutroBtn" title="Upload current Outro to Cloud Library">
-                            <svg viewBox="0 0 24 24">
-                                <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5z" />
-                            </svg>
-                            Share
-                        </button>
+
                     </div>
                     <div class="file-input-wrapper">
                         <label class="file-btn">
@@ -1309,8 +1299,7 @@
 
                 // Show Cloud UI
                 document.getElementById('tabCloud').style.display = 'block';
-                document.getElementById('uploadIntroBtn').style.display = 'flex';
-                document.getElementById('uploadOutroBtn').style.display = 'flex';
+
             }).catch(e => {
                 console.warn("Cloud Connection Failed:", e.message);
                 // Fallback allows local use if internet/firebase fails
@@ -1843,15 +1832,7 @@
             $('bedFile').value = '';
         };
 
-        // CLOUD UPLOAD HANDLERS
-        $('uploadIntroBtn').onclick = () => {
-            if (currentIntroFile) uploadToCloud(currentIntroFile, 'intro');
-            else alert("Load an Intro file first.");
-        };
-        $('uploadOutroBtn').onclick = () => {
-            if (currentOutroFile) uploadToCloud(currentOutroFile, 'outro');
-            else alert("Load an Outro file first.");
-        };
+
 
         // BATCH UPLOAD
         $('batchUploadBtn').onclick = () => $('batchUploadInput').click();
