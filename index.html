@@ -1751,9 +1751,11 @@
                     region.play();
                 });
 
-                // Stop at end of region
-                region.on('out', () => {
-                    ws.pause();
+                // Stop at end of region (Robust manual check)
+                ws.on('audioprocess', (currentTime) => {
+                    if (ws.isPlaying() && currentTime >= region.end) {
+                        ws.pause();
+                    }
                 });
             });
         }
