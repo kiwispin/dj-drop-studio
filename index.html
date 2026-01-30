@@ -723,6 +723,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- CONFIGURATION ---
         // CONNECTED TO: dji-drop-studio
@@ -742,12 +743,14 @@
 
         let cloudEnabled = false;
         let db = null;
+        let storage = null;
 
         // Init Firebase (wrapped in try-catch so app works even if Firebase fails)
         try {
             const app = initializeApp(firebaseConfig);
             const auth = getAuth(app);
             db = getFirestore(app);
+            storage = getStorage(app);
 
             // Init Auth
             signInAnonymously(auth).then(() => {
@@ -827,7 +830,7 @@
                     </div>
                     <span style="font-size:0.7rem; color:#666">Load</span>
                 `;
-                    li.onclick = () => loadFromCloud(data.data, data.name, data.type);
+                    li.onclick = () => loadFromCloud(data.downloadUrl, data.name, data.type);
                     list.appendChild(li);
                 });
             });
@@ -835,40 +838,47 @@
 
         async function uploadToCloud(file, type) {
             if (!cloudEnabled) return alert("Cloud not configured.");
-            if (file.size > 750000) return alert("File too large for Cloud Library (Max 750KB). Use local only or compress the file.");
+            if (file.size > 5000000) return alert("File too large for Cloud Library (Max 5MB).");
 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const base64 = e.target.result;
-                try {
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'sfx_library'), {
-                        name: file.name,
-                        type: type, // 'intro' or 'outro'
-                        data: base64,
-                        uploadedAt: Date.now()
-                    });
-                    alert("Uploaded to Community Library!");
-                    switchTab('cloud');
-                } catch (err) {
-                    console.error(err);
-                    alert("Upload failed.");
-                }
-            };
-            reader.readAsDataURL(file);
+            try {
+                // Upload file to Firebase Storage
+                const fileName = `${Date.now()}_${file.name}`;
+                const storageRef = ref(storage, `sfx_library/${type}/${fileName}`);
+                await uploadBytes(storageRef, file);
+                const downloadUrl = await getDownloadURL(storageRef);
+
+                // Store metadata in Firestore
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'sfx_library'), {
+                    name: file.name,
+                    type: type,
+                    downloadUrl: downloadUrl,
+                    uploadedAt: Date.now()
+                });
+                alert("Uploaded to Community Library!");
+                switchTab('cloud');
+            } catch (err) {
+                console.error(err);
+                alert("Upload failed: " + err.message);
+            }
         }
 
-        async function loadFromCloud(base64, name, type) {
-            const res = await fetch(base64);
-            const blob = await res.blob();
+        async function loadFromCloud(downloadUrl, name, type) {
+            try {
+                const res = await fetch(downloadUrl);
+                const blob = await res.blob();
 
-            if (type === 'intro') {
-                saveTrackToDB("intro", blob);
-                introBuffer = await loadAudioFile(blob);
-                $('introStatus').innerText = "Cloud: " + name;
-            } else {
-                saveTrackToDB("outro", blob);
-                outroBuffer = await loadAudioFile(blob);
-                $('outroStatus').innerText = "Cloud: " + name;
+                if (type === 'intro') {
+                    saveTrackToDB("intro", blob);
+                    introBuffer = await loadAudioFile(blob);
+                    $('introStatus').innerText = "Cloud: " + name;
+                } else {
+                    saveTrackToDB("outro", blob);
+                    outroBuffer = await loadAudioFile(blob);
+                    $('outroStatus').innerText = "Cloud: " + name;
+                }
+            } catch (err) {
+                console.error('Failed to load from cloud:', err);
+                alert('Failed to load file from cloud.');
             }
         }
 
