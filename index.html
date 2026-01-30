@@ -144,10 +144,49 @@
             background: #181818;
             border: 1px solid #333;
             color: #ccc;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .cloud-item:hover {
             border-color: var(--highlight);
+        }
+
+        .cloud-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 0.85rem;
+        }
+
+        .cloud-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .cloud-btn {
+            background: #333;
+            border: none;
+            color: #aaa;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .cloud-btn:hover {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .preview-btn:hover {
+            background: var(--intro);
+        }
+
+        .delete-btn:hover {
+            background: #e74c3c;
         }
 
         .cloud-tag {
@@ -722,8 +761,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL, getBlob } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL, getBlob, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- CONFIGURATION ---
         // CONNECTED TO: dji-drop-studio
@@ -817,20 +856,37 @@
                     return;
                 }
 
-                snapshot.forEach(doc => {
-                    const data = doc.data();
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
                     const li = document.createElement('li');
                     li.className = 'voice-item cloud-item';
-                    const tagClass = data.type === 'intro' ? 'tag-intro' : 'tag-outro';
 
                     li.innerHTML = `
-                    <div style="display:flex; align-items:center; flex:1; min-width:0;">
-                        <span class="cloud-tag ${tagClass}">${data.type}</span>
-                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${data.name}</span>
+                    <button class="cloud-btn preview-btn" title="Preview">▶</button>
+                    <span class="cloud-name">${data.name}</span>
+                    <div class="cloud-actions">
+                        <button class="cloud-btn load-btn" data-slot="intro" title="Load as Intro">→I</button>
+                        <button class="cloud-btn load-btn" data-slot="outro" title="Load as Outro">→O</button>
+                        <button class="cloud-btn delete-btn" title="Delete">🗑</button>
                     </div>
-                    <span style="font-size:0.7rem; color:#888; margin-left:10px;">Load</span>
                 `;
-                    li.onclick = () => loadFromCloud(data.storagePath, data.name, data.type);
+                    // Preview button
+                    li.querySelector('.preview-btn').onclick = (e) => {
+                        e.stopPropagation();
+                        previewCloudItem(data.storagePath);
+                    };
+                    // Load buttons
+                    li.querySelectorAll('.load-btn').forEach(btn => {
+                        btn.onclick = (e) => {
+                            e.stopPropagation();
+                            loadFromCloud(data.storagePath, data.name, btn.dataset.slot);
+                        };
+                    });
+                    // Delete button
+                    li.querySelector('.delete-btn').onclick = (e) => {
+                        e.stopPropagation();
+                        deleteCloudItem(docSnap.id, data.storagePath, data.name);
+                    };
                     list.appendChild(li);
                 });
             });
@@ -862,13 +918,13 @@
             }
         }
 
-        async function loadFromCloud(storagePath, name, type) {
+        async function loadFromCloud(storagePath, name, targetSlot) {
             try {
                 // Use Firebase SDK's getBlob to avoid CORS issues
                 const storageRef = ref(storage, storagePath);
                 const blob = await getBlob(storageRef);
 
-                if (type === 'intro') {
+                if (targetSlot === 'intro') {
                     saveTrackToDB("intro", blob);
                     introBuffer = await loadAudioFile(blob);
                     $('introStatus').innerText = "Cloud: " + name;
@@ -880,6 +936,57 @@
             } catch (err) {
                 console.error('Failed to load from cloud:', err);
                 alert('Failed to load file from cloud.');
+            }
+        }
+
+        // Preview cloud item (play without loading)
+        let previewSource = null;
+        async function previewCloudItem(storagePath) {
+            try {
+                // Stop any existing preview
+                if (previewSource) {
+                    previewSource.stop();
+                    previewSource = null;
+                }
+
+                const storageRef = ref(storage, storagePath);
+                const blob = await getBlob(storageRef);
+                const buffer = await loadAudioFile(blob);
+
+                if (ctx.state === 'suspended') await ctx.resume();
+
+                previewSource = ctx.createBufferSource();
+                previewSource.buffer = buffer;
+                previewSource.connect(ctx.destination);
+                previewSource.start();
+                previewSource.onended = () => previewSource = null;
+            } catch (err) {
+                console.error('Preview failed:', err);
+                alert('Failed to preview file.');
+            }
+        }
+
+        // Delete cloud item with PIN protection
+        const DELETE_PIN = '1234';
+        async function deleteCloudItem(docId, storagePath, name) {
+            const pin = prompt(`Enter PIN to delete "${name}":`);
+            if (pin !== DELETE_PIN) {
+                if (pin !== null) alert('Incorrect PIN.');
+                return;
+            }
+
+            try {
+                // Delete from Storage
+                const storageRef = ref(storage, storagePath);
+                await deleteObject(storageRef);
+
+                // Delete from Firestore
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sfx_library', docId));
+
+                alert('Deleted from library.');
+            } catch (err) {
+                console.error('Delete failed:', err);
+                alert('Delete failed: ' + err.message);
             }
         }
 
