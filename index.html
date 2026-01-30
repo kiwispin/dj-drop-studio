@@ -1833,8 +1833,12 @@
                 const dep = ctx.createGain(); dep.gain.value = 0.002;
                 lfo.connect(dep).connect(dly.delayTime); lfo.start(t0);
                 const hpf = ctx.createBiquadFilter(); hpf.type = 'highpass';
-                hpf.frequency.setValueAtTime(200, timeVoice); hpf.frequency.exponentialRampToValueAtTime(1000, timeVoice + buildUpDur);
+                hpf.frequency.setValueAtTime(200, timeVoice);
+                // Reduced max frequency from 1000 to 500 to prevent silencing deep voices
+                hpf.frequency.exponentialRampToValueAtTime(500, timeVoice + buildUpDur);
                 hpf.connect(dly).connect(bg).connect(masterComp);
+
+                console.log("Stutter Timings:", stutterTimings);
 
                 const startP = -300; const endP = 0;
                 for (let i = 0; i < stutterCount; i++) {
@@ -1844,7 +1848,9 @@
                     s.connect(hpf);
 
                     const timing = stutterTimings[i];
-                    s.start(timeVoice + timing.start, cuePoint, timing.dur);
+                    if (timing) {
+                        s.start(timeVoice + timing.start, cuePoint, timing.dur);
+                    }
                 }
             }
 
