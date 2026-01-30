@@ -531,29 +531,38 @@
       measurementId: "G-C3XR0N1KFY"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    
     // This ID is used to group your files in the database. 
     // Everyone using this file will see the same 'shared' folder.
     const appId = 'dji-drop-studio-main'; 
     
-    let cloudEnabled = true;
+    let cloudEnabled = false;
+    let db = null;
 
-    // Init Auth
-    signInAnonymously(auth).then(() => {
-        console.log("Connected to Cloud Library");
-        loadCloudLibrary();
+    // Init Firebase (wrapped in try-catch so app works even if Firebase fails)
+    try {
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        db = getFirestore(app);
         
-        // Show Cloud UI
-        document.getElementById('tabCloud').style.display = 'block';
-        document.getElementById('uploadIntroBtn').style.display = 'flex';
-        document.getElementById('uploadOutroBtn').style.display = 'flex';
-    }).catch(e => {
-        console.error("Cloud Connection Failed:", e);
-        // Fallback allows local use if internet/firebase fails
-    });
+        // Init Auth
+        signInAnonymously(auth).then(() => {
+            console.log("Connected to Cloud Library");
+            cloudEnabled = true;
+            loadCloudLibrary();
+            
+            // Show Cloud UI
+            document.getElementById('tabCloud').style.display = 'block';
+            document.getElementById('uploadIntroBtn').style.display = 'flex';
+            document.getElementById('uploadOutroBtn').style.display = 'flex';
+        }).catch(e => {
+            console.warn("Cloud Connection Failed:", e.message);
+            // Fallback allows local use if internet/firebase fails
+        });
+    } catch (e) {
+        console.warn("Firebase initialization failed:", e.message);
+        console.log("Running in offline mode - local features still available");
+        // App continues to work in local-only mode
+    }
 
     // --- DOM REFERENCES ---
     const $ = (id) => document.getElementById(id);
