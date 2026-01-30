@@ -723,7 +723,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL, getBlob } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // --- CONFIGURATION ---
         // CONNECTED TO: dji-drop-studio
@@ -824,13 +824,13 @@
                     const tagClass = data.type === 'intro' ? 'tag-intro' : 'tag-outro';
 
                     li.innerHTML = `
-                    <div style="display:flex; align-items:center;">
+                    <div style="display:flex; align-items:center; flex:1; min-width:0;">
                         <span class="cloud-tag ${tagClass}">${data.type}</span>
-                        <span>${data.name}</span>
+                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${data.name}</span>
                     </div>
-                    <span style="font-size:0.7rem; color:#666">Load</span>
+                    <span style="font-size:0.7rem; color:#888; margin-left:10px;">Load</span>
                 `;
-                    li.onclick = () => loadFromCloud(data.downloadUrl, data.name, data.type);
+                    li.onclick = () => loadFromCloud(data.storagePath, data.name, data.type);
                     list.appendChild(li);
                 });
             });
@@ -847,11 +847,11 @@
                 await uploadBytes(storageRef, file);
                 const downloadUrl = await getDownloadURL(storageRef);
 
-                // Store metadata in Firestore
+                // Store metadata in Firestore (with storage path for CORS-safe loading)
                 await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'sfx_library'), {
                     name: file.name,
                     type: type,
-                    downloadUrl: downloadUrl,
+                    storagePath: `sfx_library/${type}/${fileName}`,
                     uploadedAt: Date.now()
                 });
                 alert("Uploaded to Community Library!");
@@ -862,10 +862,11 @@
             }
         }
 
-        async function loadFromCloud(downloadUrl, name, type) {
+        async function loadFromCloud(storagePath, name, type) {
             try {
-                const res = await fetch(downloadUrl);
-                const blob = await res.blob();
+                // Use Firebase SDK's getBlob to avoid CORS issues
+                const storageRef = ref(storage, storagePath);
+                const blob = await getBlob(storageRef);
 
                 if (type === 'intro') {
                     saveTrackToDB("intro", blob);
