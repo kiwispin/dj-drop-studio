@@ -1112,6 +1112,11 @@
                         <input type="file" id="bedFile" accept="audio/*">
                         <div id="bedStatus" class="file-status"></div>
                     </div>
+                </div>
+                <!-- Waveform Container -->
+                <div id="bedWave" class="waveform-container" style="border-color: rgba(6, 182, 212, 0.4);"></div>
+                <div class="track-row">
+                    <div style="flex:1"></div>
                     <div class="control-group" style="flex: 1; margin: 0;">
                         <div class="control-header">
                             <span>Music Volume</span>
@@ -1542,7 +1547,11 @@
                             $('outroStatus').innerText = "Loaded: " + (file.name || "Cloud Audio");
                             initWaveform('outroWave', file, 'outro');
                         }
-                        if (type === 'bed') { musicBuffer = buff; $('bedStatus').innerText = "Loaded: " + (file.name || "Cloud Audio"); }
+                        if (type === 'bed') {
+                            musicBuffer = buff;
+                            $('bedStatus').innerText = "Loaded: " + (file.name || "Cloud Audio");
+                            initWaveform('bedWave', file, 'bed');
+                        }
                     }
                 };
             });
@@ -1682,23 +1691,25 @@
         }
 
         // -- WAVESURFER HELPER --
-        let wsIntro = null, wsOutro = null;
-        let wsIntroRegion = null, wsOutroRegion = null;
+        let wsIntro = null, wsOutro = null, wsBed = null;
+        let wsIntroRegion = null, wsOutroRegion = null, wsBedRegion = null;
         let introTrim = { start: 0, end: 0 };
         let outroTrim = { start: 0, end: 0 };
+        let bedTrim = { start: 0, end: 0 };
 
         async function initWaveform(containerId, file, type) {
             if (!file) return;
             // Clear old
             if (type === 'intro' && wsIntro) { wsIntro.destroy(); wsIntro = null; }
             if (type === 'outro' && wsOutro) { wsOutro.destroy(); wsOutro = null; }
+            if (type === 'bed' && wsBed) { wsBed.destroy(); wsBed = null; }
 
             const container = document.getElementById(containerId);
             container.innerHTML = '';
 
             const ws = WaveSurfer.create({
                 container: container,
-                waveColor: type === 'intro' ? '#0ea5e9' : '#f43f5e',
+                waveColor: type === 'intro' ? '#0ea5e9' : (type === 'outro' ? '#f43f5e' : '#06b6d4'),
                 progressColor: 'rgba(255,255,255,0.3)',
                 height: 60,
                 barWidth: 2,
@@ -1729,21 +1740,27 @@
                     wsIntro = ws;
                     wsIntroRegion = region;
                     introTrim = { start: 0, end: dur };
-                } else {
+                } else if (type === 'outro') {
                     wsOutro = ws;
                     wsOutroRegion = region;
                     outroTrim = { start: 0, end: dur };
+                } else {
+                    wsBed = ws;
+                    wsBedRegion = region;
+                    bedTrim = { start: 0, end: dur };
                 }
 
                 region.on('update-end', () => {
                     if (type === 'intro') introTrim = { start: region.start, end: region.end };
-                    else outroTrim = { start: region.start, end: region.end };
+                    else if (type === 'outro') outroTrim = { start: region.start, end: region.end };
+                    else bedTrim = { start: region.start, end: region.end };
                 });
 
-                // Update while dragging for smoother UI feedback (optional but good)
+                // Update while dragging
                 region.on('update', () => {
                     if (type === 'intro') introTrim = { start: region.start, end: region.end };
-                    else outroTrim = { start: region.start, end: region.end };
+                    else if (type === 'outro') outroTrim = { start: region.start, end: region.end };
+                    else bedTrim = { start: region.start, end: region.end };
                 });
 
                 // Play on click
@@ -1800,6 +1817,7 @@
             saveTrackToDB("bed", f);
             musicBuffer = await loadAudioFile(f);
             $('bedStatus').innerText = "Loaded: " + f.name;
+            initWaveform('bedWave', f, 'bed');
         });
 
         // CLOUD UPLOAD HANDLERS
@@ -1906,7 +1924,11 @@
             if (musicBuffer) {
                 const bedNode = offlineCtx.createBufferSource(); bedNode.buffer = musicBuffer;
                 bedGain = offlineCtx.createGain(); bedGain.gain.setValueAtTime(parseFloat($('bedVol').value), t0);
-                bedNode.connect(bedGain).connect(masterComp); bedNode.start(t0);
+                bedNode.connect(bedGain).connect(masterComp);
+
+                // Use Trimmed Duration for Bed
+                const bedDur = (bedTrim.end > bedTrim.start) ? (bedTrim.end - bedTrim.start) : musicBuffer.duration;
+                bedNode.start(t0, bedTrim.start, bedDur);
             }
 
             // -- VOICE --
