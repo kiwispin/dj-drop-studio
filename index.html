@@ -1414,13 +1414,21 @@
                 const file = new File([blob], name, { type: blob.type });
 
                 if (targetSlot === 'intro') {
+                    currentIntroFile = file;
                     saveTrackToDB("intro", file);
                     introBuffer = await loadAudioFile(file);
+                    if (introBuffer) introTrim = { start: 0, end: introBuffer.duration };
                     $('introStatus').innerText = "Cloud: " + name;
+                    initWaveform('introWave', file, 'intro');
+                    $('introFile').value = '';
                 } else {
+                    currentOutroFile = file;
                     saveTrackToDB("outro", file);
                     outroBuffer = await loadAudioFile(file);
+                    if (outroBuffer) outroTrim = { start: 0, end: outroBuffer.duration };
                     $('outroStatus').innerText = "Cloud: " + name;
+                    initWaveform('outroWave', file, 'outro');
+                    $('outroFile').value = '';
                 }
             } catch (err) {
                 console.error('Failed to load from cloud:', err);
@@ -1529,6 +1537,12 @@
             if (!idb) return;
             const tx = idb.transaction("tracks", "readwrite");
             tx.objectStore("tracks").put(file, key);
+        }
+
+        function deleteTrackFromDB(key) {
+            if (!idb) return;
+            const tx = idb.transaction("tracks", "readwrite");
+            tx.objectStore("tracks").delete(key);
         }
 
         function saveVoiceToDB(file) {
@@ -1849,7 +1863,10 @@
 
         $('clearBedBtn').onclick = () => {
             musicBuffer = null;
+            deleteTrackFromDB("bed");
             if (wsBed) { wsBed.destroy(); wsBed = null; }
+            wsBedRegion = null;
+            bedTrim = { start: 0, end: 0 };
             document.getElementById('bedWave').innerHTML = '';
             $('bedStatus').innerText = "No file loaded";
             $('bedFile').value = '';
@@ -1857,7 +1874,10 @@
 
         $('clearIntroBtn').onclick = () => {
             introBuffer = null;
+            currentIntroFile = null;
+            deleteTrackFromDB("intro");
             if (wsIntro) { wsIntro.destroy(); wsIntro = null; }
+            wsIntroRegion = null;
             document.getElementById('introWave').innerHTML = '';
             $('introStatus').innerText = "No file loaded";
             $('introFile').value = '';
@@ -1866,7 +1886,10 @@
 
         $('clearOutroBtn').onclick = () => {
             outroBuffer = null;
+            currentOutroFile = null;
+            deleteTrackFromDB("outro");
             if (wsOutro) { wsOutro.destroy(); wsOutro = null; }
+            wsOutroRegion = null;
             document.getElementById('outroWave').innerHTML = '';
             $('outroStatus').innerText = "No file loaded";
             $('outroFile').value = '';
