@@ -1844,6 +1844,7 @@
         $('clearBedBtn').onclick = () => {
             musicBuffer = null;
             if (wsBed) { wsBed.destroy(); wsBed = null; }
+            document.getElementById('bedWave').innerHTML = '';
             $('bedStatus').innerText = "No file loaded";
             $('bedFile').value = '';
         };
@@ -1851,6 +1852,7 @@
         $('clearIntroBtn').onclick = () => {
             introBuffer = null;
             if (wsIntro) { wsIntro.destroy(); wsIntro = null; }
+            document.getElementById('introWave').innerHTML = '';
             $('introStatus').innerText = "No file loaded";
             $('introFile').value = '';
             introTrim = { start: 0, end: 0 };
@@ -1859,6 +1861,7 @@
         $('clearOutroBtn').onclick = () => {
             outroBuffer = null;
             if (wsOutro) { wsOutro.destroy(); wsOutro = null; }
+            document.getElementById('outroWave').innerHTML = '';
             $('outroStatus').innerText = "No file loaded";
             $('outroFile').value = '';
             outroTrim = { start: 0, end: 0 };
