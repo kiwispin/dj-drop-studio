@@ -1713,7 +1713,9 @@
 
         async function initWaveform(containerId, file, type) {
             if (!file) return;
-            // Clear old
+
+            // Clear old instances explicitly
+            // This is key: Even if not fully ready, dump it.
             if (type === 'intro' && wsIntro) { wsIntro.destroy(); wsIntro = null; }
             if (type === 'outro' && wsOutro) { wsOutro.destroy(); wsOutro = null; }
             if (type === 'bed' && wsBed) { wsBed.destroy(); wsBed = null; }
@@ -1734,10 +1736,17 @@
                 interact: false,
             });
 
+            // Assign globals immediately so subsequent clears work
+            if (type === 'intro') wsIntro = ws;
+            else if (type === 'outro') wsOutro = ws;
+            else wsBed = ws;
+
             // Register Regions
             const wsRegions = ws.registerPlugin(WaveSurfer.Regions.create());
 
             ws.loadBlob(file);
+
+            ws.on('error', (e) => console.error("WaveSurfer Error:", e));
 
             ws.on('ready', () => {
                 const dur = ws.getDuration();
@@ -1751,15 +1760,12 @@
                 });
 
                 if (type === 'intro') {
-                    wsIntro = ws;
                     wsIntroRegion = region;
                     introTrim = { start: 0, end: dur };
                 } else if (type === 'outro') {
-                    wsOutro = ws;
                     wsOutroRegion = region;
                     outroTrim = { start: 0, end: dur };
                 } else {
-                    wsBed = ws;
                     wsBedRegion = region;
                     bedTrim = { start: 0, end: dur };
                 }
