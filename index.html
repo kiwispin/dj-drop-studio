@@ -1555,9 +1555,73 @@
         }
 
         function saveVoiceToDB(file) {
-            if (!idb) return;
-            const tx = idb.transaction("voices", "readwrite");
-            tx.objectStore("voices").add({ name: file.name, blob: file });
+            if (!idb) return Promise.resolve(null);
+            return new Promise((resolve, reject) => {
+                const tx = idb.transaction("voices", "readwrite");
+                const req = tx.objectStore("voices").add({ name: file.name, blob: file });
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        function deleteVoiceFromDB(key) {
+            if (!idb) return Promise.resolve();
+            return new Promise((resolve, reject) => {
+                const tx = idb.transaction("voices", "readwrite");
+                const req = tx.objectStore("voices").delete(key);
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        function renderVoiceList() {
+            const list = $('voiceList');
+            list.innerHTML = '';
+
+            if (!voiceLibrary.length) {
+                list.innerHTML = `
+                    <li style="padding:15px; color:#444; font-size:0.8rem; text-align:center; font-style:italic" id="emptyMsg">
+                        Library Empty
+                    </li>
+                `;
+                $('selectedVoiceName').textContent = 'No Voice Selected';
+                selectedVoiceIndex = -1;
+                return;
+            }
+
+            voiceLibrary.forEach((voice, i) => {
+                addVoiceToUI(voice.name, i, voice.buffer.duration);
+            });
+
+            if (selectedVoiceIndex < 0 || selectedVoiceIndex >= voiceLibrary.length) {
+                selectedVoiceIndex = 0;
+            }
+            selectVoice(selectedVoiceIndex);
+        }
+
+        async function deleteVoiceByIndex(index) {
+            const voice = voiceLibrary[index];
+            if (!voice) return;
+            if (!confirm(`Remove "${voice.name}" from My Crate?`)) return;
+
+            try {
+                if (voice.dbKey !== undefined && voice.dbKey !== null) {
+                    await deleteVoiceFromDB(voice.dbKey);
+                }
+
+                voiceLibrary.splice(index, 1);
+
+                if (selectedVoiceIndex === index) {
+                    selectedVoiceIndex = Math.min(index, voiceLibrary.length - 1);
+                } else if (selectedVoiceIndex > index) {
+                    selectedVoiceIndex--;
+                }
+
+                renderVoiceList();
+            } catch (err) {
+                console.error('Failed to delete local voice:', err);
+                alert('Failed to remove from My Crate.');
+            }
         }
 
         async function loadSavedAssets() {
@@ -1596,21 +1660,32 @@
             // Voices
             const vTx = idb.transaction("voices", "readonly");
             const vStore = vTx.objectStore("voices");
-            const vReq = vStore.getAll();
-            vReq.onsuccess = async () => {
-                const voices = vReq.result;
-                if (voices && voices.length > 0) {
-                    $('emptyMsg').style.display = 'none';
-                    for (let v of voices) {
-                        const buff = await loadAudioFile(v.blob);
-                        if (buff) {
-                            const id = voiceLibrary.length;
-                            voiceLibrary.push({ name: v.name, buffer: buff });
-                            addVoiceToUI(v.name, id, buff.duration);
-                        }
-                    }
-                    if (voiceLibrary.length > 0) selectVoice(0);
+            const vReq = vStore.openCursor();
+            voiceLibrary = [];
+            selectedVoiceIndex = -1;
+            vReq.onsuccess = async (e) => {
+                const cursor = e.target.result;
+                if (!cursor) {
+                    renderVoiceList();
+                    return;
                 }
+
+                const value = cursor.value || {};
+                const blob = value.blob || value.file || null;
+                if (!blob) {
+                    cursor.continue();
+                    return;
+                }
+
+                const buff = await loadAudioFile(blob);
+                if (buff) {
+                    voiceLibrary.push({
+                        name: value.name || blob.name || 'Voice',
+                        buffer: buff,
+                        dbKey: cursor.primaryKey
+                    });
+                }
+                cursor.continue();
             };
         }
 
@@ -1707,24 +1782,36 @@
             const list = $('voiceList');
             const li = document.createElement('li');
             li.className = 'voice-item';
-            li.innerHTML = `<span>${name}</span> <span style="font-size:0.7rem; color:#666">${duration.toFixed(1)}s</span>`;
+            li.innerHTML = `
+                <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</span>
+                <span style="font-size:0.7rem; color:#666; margin-left:8px;">${duration.toFixed(1)}s</span>
+                <button class="lib-btn" title="Remove from My Crate" style="margin-left:8px; padding:4px 7px;">🗑</button>
+            `;
             li.onclick = () => selectVoice(id);
             li.dataset.id = id;
+            li.querySelector('button').onclick = async (e) => {
+                e.stopPropagation();
+                await deleteVoiceByIndex(id);
+            };
             list.appendChild(li);
         }
 
         function selectVoice(idx) {
             selectedVoiceIndex = idx;
-            document.querySelectorAll('.voice-item').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('#voiceList .voice-item').forEach(el => el.classList.remove('active'));
             // Simplified visual selection update
-            const items = document.querySelectorAll('.voice-item');
+            const items = document.querySelectorAll('#voiceList .voice-item');
             for (let i = 0; i < items.length; i++) {
                 if (items[i].dataset.id == idx) {
                     items[i].classList.add('active');
                     break;
                 }
             }
-            if (voiceLibrary[idx]) $('selectedVoiceName').textContent = voiceLibrary[idx].name;
+            if (voiceLibrary[idx]) {
+                $('selectedVoiceName').textContent = voiceLibrary[idx].name;
+            } else {
+                $('selectedVoiceName').textContent = 'No Voice Selected';
+            }
         }
 
         // -- WAVESURFER HELPER --
@@ -1828,17 +1915,15 @@
         $('voiceUploader').addEventListener('change', async (e) => {
             const files = Array.from(e.target.files);
             if (!files.length) return;
-            $('emptyMsg').style.display = 'none';
             for (let file of files) {
-                saveVoiceToDB(file);
                 const buff = await loadAudioFile(file);
                 if (buff) {
-                    const id = voiceLibrary.length;
-                    voiceLibrary.push({ name: file.name, buffer: buff });
-                    addVoiceToUI(file.name, id, buff.duration);
+                    const dbKey = await saveVoiceToDB(file);
+                    voiceLibrary.push({ name: file.name, buffer: buff, dbKey });
                 }
             }
-            if (selectedVoiceIndex === -1 && voiceLibrary.length > 0) selectVoice(0);
+            renderVoiceList();
+            $('voiceUploader').value = '';
         });
 
         $('introFile').addEventListener('change', async (e) => {
