@@ -1079,7 +1079,7 @@
                                 <span>Volume</span>
                                 <span class="val-display" id="voiceVolVal">1.0</span>
                             </div>
-                            <input type="range" id="voiceVol" min="0" max="3.0" step="0.1" value="1.0">
+                            <input type="range" id="voiceVol" min="0" max="5.0" step="0.1" value="1.0">
                         </div>
                         <div class="control-group">
                             <div class="control-header">
@@ -1981,7 +1981,19 @@
                 lfo.connect(dep).connect(dly.delayTime); lfo.start(t0);
                 const hpf = offlineCtx.createBiquadFilter(); hpf.type = 'highpass';
                 hpf.frequency.setValueAtTime(200, timeVoice); hpf.frequency.exponentialRampToValueAtTime(1000, timeVoice + buildUpDur);
-                hpf.connect(dly).connect(bg).connect(masterComp);
+
+                // Mic Boost Logic for Buildup
+                if ($('micBoost') && $('micBoost').checked) {
+                    const bBoost = offlineCtx.createGain();
+                    bBoost.gain.value = 6.0; // Match Main Boost
+
+                    const bComp = offlineCtx.createDynamicsCompressor();
+                    bComp.threshold.value = -30; bComp.knee.value = 10; bComp.ratio.value = 16; bComp.attack.value = 0.002; bComp.release.value = 0.1;
+
+                    hpf.connect(dly).connect(bg).connect(bBoost).connect(bComp).connect(masterComp);
+                } else {
+                    hpf.connect(dly).connect(bg).connect(masterComp);
+                }
 
                 const startP = -300; const endP = 0;
                 for (let i = 0; i < stutterCount; i++) {
