@@ -1337,8 +1337,17 @@
                     return;
                 }
 
+                const cloudItems = [];
                 snapshot.forEach(docSnap => {
-                    const data = docSnap.data();
+                    cloudItems.push({ docSnap, data: docSnap.data() });
+                });
+
+                // Natural sort by name so numbered files render in human order (e.g., 001, 002, 010).
+                cloudItems.sort((a, b) =>
+                    (a.data.name || '').localeCompare((b.data.name || ''), undefined, { numeric: true, sensitivity: 'base' })
+                );
+
+                cloudItems.forEach(({ docSnap, data }) => {
                     const li = document.createElement('li');
                     li.className = 'voice-item cloud-item';
 
