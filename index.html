@@ -1817,6 +1817,7 @@
             currentIntroFile = f;
             saveTrackToDB("intro", f);
             introBuffer = await loadAudioFile(f);
+            if (introBuffer) introTrim = { start: 0, end: introBuffer.duration };
             $('introStatus').innerText = "Loaded: " + f.name;
             initWaveform('introWave', f, 'intro');
         });
@@ -1826,6 +1827,7 @@
             currentOutroFile = f;
             saveTrackToDB("outro", f);
             outroBuffer = await loadAudioFile(f);
+            if (outroBuffer) outroTrim = { start: 0, end: outroBuffer.duration };
             $('outroStatus').innerText = "Loaded: " + f.name;
             initWaveform('outroWave', f, 'outro');
         });
@@ -1834,6 +1836,7 @@
             const f = e.target.files[0]; if (!f) return;
             saveTrackToDB("bed", f);
             musicBuffer = await loadAudioFile(f);
+            if (musicBuffer) bedTrim = { start: 0, end: musicBuffer.duration };
             $('bedStatus').innerText = "Loaded: " + f.name;
             initWaveform('bedWave', f, 'bed');
         });
@@ -1841,7 +1844,6 @@
         $('clearBedBtn').onclick = () => {
             musicBuffer = null;
             if (wsBed) { wsBed.destroy(); wsBed = null; }
-            document.getElementById('bedWave').innerHTML = '';
             $('bedStatus').innerText = "No file loaded";
             $('bedFile').value = '';
         };
@@ -1849,7 +1851,6 @@
         $('clearIntroBtn').onclick = () => {
             introBuffer = null;
             if (wsIntro) { wsIntro.destroy(); wsIntro = null; }
-            document.getElementById('introWave').innerHTML = '';
             $('introStatus').innerText = "No file loaded";
             $('introFile').value = '';
             introTrim = { start: 0, end: 0 };
@@ -1858,7 +1859,6 @@
         $('clearOutroBtn').onclick = () => {
             outroBuffer = null;
             if (wsOutro) { wsOutro.destroy(); wsOutro = null; }
-            document.getElementById('outroWave').innerHTML = '';
             $('outroStatus').innerText = "No file loaded";
             $('outroFile').value = '';
             outroTrim = { start: 0, end: 0 };
