@@ -1574,6 +1574,13 @@
             });
         }
 
+        function idbRequestToPromise(req) {
+            return new Promise((resolve, reject) => {
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
         function renderVoiceList() {
             const list = $('voiceList');
             list.innerHTML = '';
@@ -1658,35 +1665,35 @@
             });
 
             // Voices
-            const vTx = idb.transaction("voices", "readonly");
-            const vStore = vTx.objectStore("voices");
-            const vReq = vStore.openCursor();
             voiceLibrary = [];
             selectedVoiceIndex = -1;
-            vReq.onsuccess = async (e) => {
-                const cursor = e.target.result;
-                if (!cursor) {
-                    renderVoiceList();
-                    return;
-                }
+            try {
+                const vTx = idb.transaction("voices", "readonly");
+                const vStore = vTx.objectStore("voices");
+                const [voices, keys] = await Promise.all([
+                    idbRequestToPromise(vStore.getAll()),
+                    idbRequestToPromise(vStore.getAllKeys())
+                ]);
 
-                const value = cursor.value || {};
-                const blob = value.blob || value.file || null;
-                if (!blob) {
-                    cursor.continue();
-                    return;
-                }
+                for (let i = 0; i < voices.length; i++) {
+                    const value = voices[i] || {};
+                    const blob = value.blob || value.file || null;
+                    if (!blob) continue;
 
-                const buff = await loadAudioFile(blob);
-                if (buff) {
-                    voiceLibrary.push({
-                        name: value.name || blob.name || 'Voice',
-                        buffer: buff,
-                        dbKey: cursor.primaryKey
-                    });
+                    const buff = await loadAudioFile(blob);
+                    if (buff) {
+                        voiceLibrary.push({
+                            name: value.name || blob.name || 'Voice',
+                            buffer: buff,
+                            dbKey: keys[i]
+                        });
+                    }
                 }
-                cursor.continue();
-            };
+            } catch (err) {
+                console.error('Failed loading local voices:', err);
+            }
+
+            renderVoiceList();
         }
 
         // -- AUDIO HELPERS --
