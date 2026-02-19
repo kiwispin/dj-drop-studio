@@ -937,6 +937,8 @@
                         <label class="file-btn">
                             Load Intro <input type="file" id="introFile" accept="audio/*">
                         </label>
+                        <button class="param-btn" id="clearIntroBtn" style="padding: 4px 8px; margin-left: 2px;"
+                            title="Clear">🗑</button>
                         <span id="introStatus" class="file-status">No file loaded</span>
                     </div>
                     <!-- Waveform Container -->
@@ -966,6 +968,8 @@
                         <label class="file-btn">
                             Load Outro <input type="file" id="outroFile" accept="audio/*">
                         </label>
+                        <button class="param-btn" id="clearOutroBtn" style="padding: 4px 8px; margin-left: 2px;"
+                            title="Clear">🗑</button>
                         <span id="outroStatus" class="file-status">No file loaded</span>
                     </div>
                     <!-- Waveform Container -->
@@ -1840,6 +1844,24 @@
             document.getElementById('bedWave').innerHTML = '';
             $('bedStatus').innerText = "No file loaded";
             $('bedFile').value = '';
+        };
+
+        $('clearIntroBtn').onclick = () => {
+            introBuffer = null;
+            if (wsIntro) { wsIntro.destroy(); wsIntro = null; }
+            document.getElementById('introWave').innerHTML = '';
+            $('introStatus').innerText = "No file loaded";
+            $('introFile').value = '';
+            introTrim = { start: 0, end: 0 };
+        };
+
+        $('clearOutroBtn').onclick = () => {
+            outroBuffer = null;
+            if (wsOutro) { wsOutro.destroy(); wsOutro = null; }
+            document.getElementById('outroWave').innerHTML = '';
+            $('outroStatus').innerText = "No file loaded";
+            $('outroFile').value = '';
+            outroTrim = { start: 0, end: 0 };
         };
 
 
