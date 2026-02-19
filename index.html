@@ -2020,9 +2020,14 @@
                     const wg = offlineCtx.createGain(); wg.gain.value = wAmt * 0.85;
                     const sL = offlineCtx.createBufferSource(); sL.buffer = voiceObj.buffer; sL.detune.value = (pitchSemis * 100) - 25;
                     const sR = offlineCtx.createBufferSource(); sR.buffer = voiceObj.buffer; sR.detune.value = (pitchSemis * 100) + 25;
-                    const dL = offlineCtx.createDelay(); dL.delayTime.value = 0.018; const pL = offlineCtx.createStereoPanner(); pL.pan.value = -1;
-                    const dR = offlineCtx.createDelay(); dR.delayTime.value = 0.028; const pR = offlineCtx.createStereoPanner(); pR.pan.value = 1;
-                    sL.connect(dL).connect(pL).connect(wg); sR.connect(dR).connect(pR).connect(wg); wg.connect(masterComp);
+                    const dL = offlineCtx.createDelay(); dL.delayTime.value = 0.018;
+                    const dR = offlineCtx.createDelay(); dR.delayTime.value = 0.028;
+
+                    const merger = offlineCtx.createChannelMerger(2);
+                    sL.connect(dL).connect(merger, 0, 0); // Left
+                    sR.connect(dR).connect(merger, 0, 1); // Right
+
+                    merger.connect(wg).connect(masterComp);
                     sL.start(absVoiceStart, cuePoint); sR.start(absVoiceStart, cuePoint);
                 }
             }
