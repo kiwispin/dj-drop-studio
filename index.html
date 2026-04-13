@@ -2075,7 +2075,7 @@
             if (timeVoice < t0) timeVoice = t0;
             const absVoiceStart = timeVoice + buildUpDur;
             const voiceEnd = absVoiceStart + rawVoiceDur;
-            const realOutroStart = voiceEnd + outroOffset;
+            let realOutroStart = voiceEnd + outroOffset;
             if (realOutroStart < t0) realOutroStart = t0;
 
             // Use Trimmed Duration for Outro

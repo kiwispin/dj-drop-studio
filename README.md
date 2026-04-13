@@ -603,7 +603,7 @@ dj-drop-studio/
 | Issue | Detail |
 |---|---|
 | **Delete PIN** | Hardcoded as `"262626"` — visible in source. Provides minimal protection. |
-| **`const` reassignment bug** | Line ~1987: `const realOutroStart` is reassigned in a dead `if` branch. Safe in practice as `outroOffset ≥ –5s` and `voiceEnd ≥ 0`. |
+| ~~**`const` reassignment bug**~~ | ✅ Fixed — `realOutroStart` refactored from `const` to `let`. |
 | **WaveSurfer 7 region end** | WaveSurfer 7 doesn't auto-stop at region end; an `audioprocess` listener is attached as a manual stop failsafe. |
 | **Voices are append-only** | No UI to delete individual voices from IndexedDB. They accumulate across sessions. |
 | **AudioContext at load** | `AudioContext` is created at top-level (may be suspended by browser policy); `initAudio()` resumes it on the first user gesture. |
@@ -625,8 +625,8 @@ The current voice library is append-only — users cannot delete, rename, or reo
 ### 3. 📦 Preset System (Scene Save/Load)
 There is no way to save and recall a complete mix configuration (track files + all slider and FX settings). A preset system backed by IndexedDB or localStorage JSON export would allow users to maintain a library of drop templates (e.g., "Morning Show Ident", "News Bulletin Hit") and recall them instantly.
 
-### 4. ⚖️ Fix the `const` Reassignment Bug
-`realOutroStart` is declared with `const` but guarded by a conditional reassignment that is currently unreachable. While dormant, this will throw a `TypeError` in strict mode if the guard condition is ever triggered. Refactor to `let` or eliminate the guard entirely.
+### ~~4. ⚖️ Fix the `const` Reassignment Bug~~ ✅ Fixed
+~~`realOutroStart` is declared with `const` but guarded by a conditional reassignment that is currently unreachable. While dormant, this will throw a `TypeError` in strict mode if the guard condition is ever triggered. Refactor to `let` or eliminate the guard entirely.~~
 
 ### 5. 📱 Responsive / Mobile Layout
 The current layout uses a fixed 260px sidebar with sticky positioning that does not adapt well to viewports narrower than ~900px. Implementing a collapsible drawer-style sidebar and touch-optimised slider controls would make the app usable on tablets — valuable for remote presenters and on-location production.
