@@ -1239,7 +1239,7 @@
                                 <span>Volume</span>
                                 <span class="val-display" id="voiceVolVal">1.0</span>
                             </div>
-                            <input type="range" id="voiceVol" min="0" max="5.0" step="0.1" value="1.0">
+                            <input type="range" id="voiceVol" min="0" max="2.0" step="0.05" value="1.0">
                         </div>
                         <div class="control-group">
                             <div class="control-header">
@@ -2510,7 +2510,16 @@
                 head.connect(vg);
             }
 
-            vg.connect(masterComp);
+            // Voice Limiter — transparent brick-wall limiter inserted before masterComp.
+            // Catches any peaks from high voiceVol or Mic Boost before they can clip.
+            const voiceLimiter = offlineCtx.createDynamicsCompressor();
+            voiceLimiter.threshold.value = -3;    // only activates on genuinely hot signals
+            voiceLimiter.knee.value      = 0;     // hard knee — immediate limiting
+            voiceLimiter.ratio.value     = 20;    // 20:1 ≈ brick wall
+            voiceLimiter.attack.value    = 0.0005; // 0.5ms catches fast transients
+            voiceLimiter.release.value   = 0.1;
+            vg.connect(voiceLimiter);
+            voiceLimiter.connect(masterComp);
 
             // Tail FX
             if (tailOn) {
