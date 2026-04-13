@@ -861,10 +861,156 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* === PRESET SYSTEM === */
+        .preset-save-btn {
+            width: 100%;
+            padding: 11px 16px;
+            background: linear-gradient(135deg, rgba(217, 70, 239, 0.2), rgba(168, 85, 247, 0.15));
+            border: 1px solid rgba(217, 70, 239, 0.35);
+            border-radius: var(--radius-sm);
+            color: var(--voice);
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s ease;
+            margin-bottom: 14px;
+        }
+
+        .preset-save-btn:hover {
+            background: linear-gradient(135deg, rgba(217, 70, 239, 0.35), rgba(168, 85, 247, 0.25));
+            border-color: var(--voice);
+            box-shadow: 0 0 16px rgba(217, 70, 239, 0.2);
+        }
+
+        .preset-save-btn:active {
+            transform: scale(0.97);
+        }
+
+        .preset-section-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            padding-left: 2px;
+        }
+
+        .preset-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            animation: slideIn 0.2s ease-out;
+            transition: border-color 0.15s ease;
+        }
+
+        .preset-card:hover {
+            border-color: rgba(217, 70, 239, 0.3);
+        }
+
+        .preset-name {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 3px;
+        }
+
+        .preset-meta {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 8px;
+        }
+
+        .preset-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .preset-load-btn {
+            flex: 1;
+            padding: 5px 10px;
+            background: rgba(217, 70, 239, 0.15);
+            border: 1px solid rgba(217, 70, 239, 0.3);
+            border-radius: 5px;
+            color: var(--voice);
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .preset-load-btn:hover {
+            background: rgba(217, 70, 239, 0.3);
+            border-color: var(--voice);
+        }
+
+        .preset-del-btn {
+            padding: 5px 9px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .preset-del-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.5);
+            color: #ef4444;
+        }
+
+        .preset-empty {
+            padding: 20px 10px;
+            text-align: center;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: rgba(30, 30, 30, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--text);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            z-index: 9999;
+            backdrop-filter: blur(10px);
+            white-space: nowrap;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
     </style>
 </head>
 
 <body>
+
+    <!-- Toast notification -->
+    <div class="toast" id="toastEl"></div>
 
     <div class="studio-container">
 
@@ -873,6 +1019,7 @@
             <!-- TABS -->
             <div class="tabs">
                 <div class="tab active" id="tabLocal">My Crate</div>
+                <div class="tab" id="tabPresets">Presets</div>
                 <div class="tab" id="tabCloud" style="display:none">Cloud SFX</div>
             </div>
 
@@ -894,6 +1041,15 @@
                     style="margin-top:auto; padding-top:10px; border-top:1px solid #333; font-size:0.7rem; color:#666; text-align:center;">
                     Files saved to Browser Memory (IndexedDB)
                 </div>
+            </div>
+
+            <!-- PRESETS CONTENT -->
+            <div id="contentPresets" class="tab-content">
+                <button class="preset-save-btn" id="savePresetBtn">💾 Save Current Mix</button>
+                <div class="preset-section-label">Saved Scenes</div>
+                <ul class="voice-list" id="presetList">
+                    <li class="preset-empty">No presets yet</li>
+                </ul>
             </div>
 
             <!-- CLOUD CONTENT -->
@@ -1242,8 +1398,10 @@
 
         // --- DOM ELEMENTS & EVENT LISTENERS ---
         const tabLocal = document.getElementById('tabLocal');
+        const tabPresets = document.getElementById('tabPresets');
         const tabCloud = document.getElementById('tabCloud');
         const contentLocal = document.getElementById('contentLocal');
+        const contentPresets = document.getElementById('contentPresets');
         const contentCloud = document.getElementById('contentCloud');
         const voiceUploader = document.getElementById('voiceUploader');
         const voiceList = document.getElementById('voiceList');
@@ -1251,18 +1409,22 @@
 
         // TABS
         tabLocal.onclick = () => { switchTab('local'); };
+        tabPresets.onclick = () => { switchTab('presets'); };
         tabCloud.onclick = () => { switchTab('cloud'); };
 
         function switchTab(tab) {
+            // Reset all tabs and content panels
+            [tabLocal, tabPresets, tabCloud].forEach(t => t.classList.remove('active'));
+            [contentLocal, contentPresets, contentCloud].forEach(c => c.classList.remove('active'));
+
             if (tab === 'local') {
                 tabLocal.classList.add('active');
-                tabCloud.classList.remove('active');
                 contentLocal.classList.add('active');
-                contentCloud.classList.remove('active');
+            } else if (tab === 'presets') {
+                tabPresets.classList.add('active');
+                contentPresets.classList.add('active');
             } else {
-                tabLocal.classList.remove('active');
                 tabCloud.classList.add('active');
-                contentLocal.classList.remove('active');
                 contentCloud.classList.add('active');
             }
         }
@@ -1297,6 +1459,148 @@
 
         // Init settings on load
         loadSettings();
+
+        // --- PRESET SYSTEM ---
+        const PRESETS_KEY = 'dj-drop-presets';
+
+        function getPresets() {
+            try { return JSON.parse(localStorage.getItem(PRESETS_KEY)) || []; }
+            catch (e) { return []; }
+        }
+
+        function savePresets(arr) {
+            localStorage.setItem(PRESETS_KEY, JSON.stringify(arr));
+        }
+
+        function saveCurrentPreset(name) {
+            const settings = {};
+            document.querySelectorAll('input[type="range"]').forEach(input => {
+                settings[input.id] = input.value;
+            });
+            document.querySelectorAll('input[type="checkbox"]').forEach(input => {
+                settings[input.id] = input.checked;
+            });
+
+            const preset = {
+                id: String(Date.now()),
+                name: name,
+                createdAt: Date.now(),
+                voiceIndex: selectedVoiceIndex,
+                voiceName: (selectedVoiceIndex >= 0 && voiceLibrary[selectedVoiceIndex])
+                    ? voiceLibrary[selectedVoiceIndex].name
+                    : 'No voice',
+                settings,
+                trim: {
+                    intro: { ...introTrim },
+                    outro: { ...outroTrim },
+                    bed:   { ...bedTrim }
+                }
+            };
+
+            const presets = getPresets();
+            presets.unshift(preset); // newest first
+            savePresets(presets);
+            renderPresetList();
+            showToast(`✓ Preset "${name}" saved`);
+        }
+
+        function loadPreset(id) {
+            const preset = getPresets().find(p => p.id === id);
+            if (!preset) return;
+
+            // Restore sliders & checkboxes
+            const settings = preset.settings || {};
+            document.querySelectorAll('input[type="range"]').forEach(input => {
+                if (settings[input.id] !== undefined) {
+                    input.value = settings[input.id];
+                    input.dispatchEvent(new Event('input'));
+                }
+            });
+            document.querySelectorAll('input[type="checkbox"]').forEach(input => {
+                if (settings[input.id] !== undefined) {
+                    input.checked = settings[input.id];
+                    input.dispatchEvent(new Event('change'));
+                }
+            });
+
+            // Restore trim regions
+            if (preset.trim) {
+                if (preset.trim.intro) introTrim = { ...preset.trim.intro };
+                if (preset.trim.outro) outroTrim = { ...preset.trim.outro };
+                if (preset.trim.bed)   bedTrim   = { ...preset.trim.bed };
+
+                // Sync WaveSurfer regions to restored trim values
+                if (wsIntroRegion && preset.trim.intro) wsIntroRegion.setOptions({ start: introTrim.start, end: introTrim.end });
+                if (wsOutroRegion && preset.trim.outro) wsOutroRegion.setOptions({ start: outroTrim.start, end: outroTrim.end });
+                if (wsBedRegion   && preset.trim.bed)   wsBedRegion.setOptions({   start: bedTrim.start,   end: bedTrim.end   });
+            }
+
+            // Restore voice selection
+            const vi = preset.voiceIndex;
+            if (vi >= 0 && voiceLibrary[vi]) {
+                selectVoice(vi);
+                showToast(`▶ "${preset.name}" loaded`);
+            } else {
+                if (vi >= 0) showToast(`⚠ "${preset.name}" loaded — voice no longer in library`);
+                else showToast(`▶ "${preset.name}" loaded`);
+            }
+        }
+
+        function deletePreset(id) {
+            const presets = getPresets().filter(p => p.id !== id);
+            savePresets(presets);
+            renderPresetList();
+        }
+
+        function renderPresetList() {
+            const list = $('presetList');
+            list.innerHTML = '';
+            const presets = getPresets();
+
+            if (!presets.length) {
+                list.innerHTML = '<li class="preset-empty">No presets yet — mix something and save!</li>';
+                return;
+            }
+
+            presets.forEach(preset => {
+                const li = document.createElement('li');
+                li.className = 'preset-card';
+                const date = new Date(preset.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                li.innerHTML = `
+                    <div class="preset-name">🎤 ${preset.name}</div>
+                    <div class="preset-meta">Voice: ${preset.voiceName} &middot; ${date}</div>
+                    <div class="preset-actions">
+                        <button class="preset-load-btn" data-id="${preset.id}">▶ Load</button>
+                        <button class="preset-del-btn" data-id="${preset.id}" title="Delete preset">🗑</button>
+                    </div>
+                `;
+                li.querySelector('.preset-load-btn').onclick = () => loadPreset(preset.id);
+                li.querySelector('.preset-del-btn').onclick = () => {
+                    if (confirm(`Delete preset "${preset.name}"?`)) deletePreset(preset.id);
+                };
+                list.appendChild(li);
+            });
+        }
+
+        let _toastTimer = null;
+        function showToast(msg) {
+            const el = $('toastEl');
+            el.textContent = msg;
+            el.classList.add('show');
+            if (_toastTimer) clearTimeout(_toastTimer);
+            _toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+        }
+
+        // Wire Save button
+        $('savePresetBtn').onclick = () => {
+            let name = prompt('Name this preset:', 'My Mix');
+            if (name === null) return; // cancelled
+            name = name.trim() || 'Untitled Preset';
+            saveCurrentPreset(name);
+        };
+
+        // Render presets on load
+        renderPresetList();
 
         // --- FIREBASE INIT ---
         try {
