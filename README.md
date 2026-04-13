@@ -622,8 +622,10 @@ The current PIN (`1234`) is visible in plain source code and offers negligible s
 ### 2. 🗑️ Voice Library Management
 The current voice library is append-only — users cannot delete, rename, or reorder voice recordings stored in IndexedDB. Adding a context menu or long-press interaction on voice list items to support rename and delete operations would significantly improve the day-to-day workflow for users managing large voice libraries.
 
-### 3. 📦 Preset System (Scene Save/Load)
-There is no way to save and recall a complete mix configuration (track files + all slider and FX settings). A preset system backed by IndexedDB or localStorage JSON export would allow users to maintain a library of drop templates (e.g., "Morning Show Ident", "News Bulletin Hit") and recall them instantly.
+### ~~3. 📦 Preset System (Scene Save/Load)~~ ✅ Implemented
+~~There is no way to save and recall a complete mix configuration (track files + all slider and FX settings). A preset system backed by IndexedDB or localStorage JSON export would allow users to maintain a library of drop templates (e.g., "Morning Show Ident", "News Bulletin Hit") and recall them instantly.~~
+
+A **Presets tab** has been added to the sidebar. Users can name and save the full mix state (all sliders, checkboxes, trim regions, and active voice), then recall or delete presets at any time. Data is stored in `localStorage` under `dj-drop-presets`. A toast notification confirms save/load actions.
 
 ### ~~4. ⚖️ Fix the `const` Reassignment Bug~~ ✅ Fixed
 ~~`realOutroStart` is declared with `const` but guarded by a conditional reassignment that is currently unreachable. While dormant, this will throw a `TypeError` in strict mode if the guard condition is ever triggered. Refactor to `let` or eliminate the guard entirely.~~
